@@ -82,6 +82,9 @@
     "hyde": "HyDE",
     "hyde_desc": "Generate hypothetical answer for better retrieval",
     "max_history": "History Turns",
+    "conversation_mode": "Default Mode",
+    "conversation_mode_single": "Single-turn",
+    "conversation_mode_multi": "Multi-turn",
     "restore_default": "Restore Default",
     "save": "Save Settings",
     "saved_title": "Saved",
@@ -89,7 +92,12 @@
     "restart_title": "Restart Required",
     "restart_msg": "Embedding model changed from \"{old}\" to \"{new}\".\n\nThe vector database must be rebuilt with the new dimensions to work correctly.\nRestart the app now?",
     "restart_now": "Restart Now",
-    "restart_later": "Restart Later"
+    "restart_later": "Restart Later",
+    "embed_builtin": "Built-in, compact",
+    "embed_en": "English",
+    "embed_multi": "Multi-lingual",
+    "embed_downloaded": "Downloaded",
+    "embed_need_download": "Download needed"
   },
   "api": {
     "title": "API Configuration",
@@ -136,7 +144,9 @@
     "title": "Reference Sources",
     "empty_hint": "Sources will appear here after asking a question",
     "no_sources": "No reference sources",
-    "unknown": "unknown"
+    "unknown": "unknown",
+    "chapter_label": "📂 {heading}",
+    "score_label": "🎯 Match"
   },
   "history": {
     "title": "History",
@@ -144,7 +154,9 @@
   },
   "input": {
     "send": "Send",
-    "placeholder": "Enter your question, Ctrl+Enter to send…"
+    "placeholder": "Enter your question, Ctrl+Enter to send…",
+    "single_turn": "Single",
+    "multi_turn": "Multi"
   },
   "index": {
     "import_error": "Failed to import core modules: {detail}",

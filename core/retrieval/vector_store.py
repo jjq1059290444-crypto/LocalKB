@@ -65,6 +65,7 @@ class VectorStore:
                 "payload": {
                     "source_file": metadatas[i].get("source_file", ""),
                     "chunk_index": metadatas[i].get("chunk_index", 0),
+                    "heading": metadatas[i].get("heading", ""),
                     "content": documents[i] if i < len(documents) else "",
                 },
             }
@@ -216,7 +217,7 @@ class VectorStore:
                     payload={
                         "source_file": payload.get("source_file", ""),
                         "chunk_index": payload.get("chunk_index", 0),
-                        "content": payload.get("content", ""),
+                        "content": payload.get("content_preview", payload.get("content", "")),
                     },
                 ))
 
@@ -307,11 +308,23 @@ def _flatten_results(results) -> list[dict]:
     out = []
     for pt in results.points:
         payload = pt.payload or {}
+        heading = payload.get("heading", "")
+        if not heading:
+            # Fallback: extract from content for old data
+            heading = _extract_heading(payload.get("content", ""))
         out.append({
             "id": pt.id,
             "source_file": payload.get("source_file", ""),
             "chunk_index": payload.get("chunk_index", 0),
+            "heading": heading,
             "content": payload.get("content", ""),
             "score": pt.score or 0.0,
         })
     return out
+
+
+def _extract_heading(text: str) -> str:
+    """Extract the first H2 heading from chunk text (old-data fallback)."""
+    import re
+    m = re.search(r'^##\s+(.+)$', text, re.MULTILINE)
+    return m.group(1).strip() if m else ""

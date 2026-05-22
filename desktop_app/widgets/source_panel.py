@@ -1,4 +1,6 @@
-"""source_panel.py — reference sources panel."""
+"""source_panel.py — reference sources panel (file, chapter, score, preview)."""
+
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QSizePolicy,
@@ -7,7 +9,7 @@ from PySide6.QtCore import Qt
 
 
 class SourcePanel(QWidget):
-    """Right panel: shows reference sources for the current answer."""
+    """Right panel: shows reference sources with file, chapter, match score."""
 
     def __init__(self, i18n, parent=None):
         super().__init__(parent)
@@ -59,8 +61,53 @@ class SourcePanel(QWidget):
         if self._showing_empty:
             self._empty.setText(self._i18n.t("source.empty_hint"))
 
+    # ── helpers ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _short_name(source_file: str) -> str:
+        """Extract a human-friendly file name from a full source path."""
+        name = Path(source_file).name
+        # Drop common extensions
+        for ext in (".md", ".txt", ".pdf", ".docx", ".pptx", ".ppt"):
+            if name.endswith(ext):
+                name = name[:-len(ext)]
+                break
+        return name if name else source_file
+
+    @staticmethod
+    def _score_pct(score: float) -> int:
+        """Convert Qdrant score to a 0–100 percentage for display."""
+        # Qdrant cosine scores are typically in [0, 1]; clamp safely
+        return max(0, min(100, round(score * 100)))
+
+    def _score_bar_html(self, pct: int) -> str:
+        """Render a slim CSS progress bar as inline HTML."""
+        bar_color = (
+            "#00B894" if pct >= 70 else
+            "#FDCB6E" if pct >= 40 else
+            "#E17055"
+        )
+        return (
+            f'<span style="'
+            f'display:inline-block;width:60px;height:6px;'
+            f'background:#E8ECF0;border-radius:3px;'
+            f'vertical-align:middle;margin:0 6px;'
+            f'">'
+            f'<span style="'
+            f'display:inline-block;width:{pct}%;height:6px;'
+            f'background:{bar_color};border-radius:3px;'
+            f'"></span>'
+            f'</span>'
+            f'<span style="font-size:11px;color:#636E72;">{pct}%</span>'
+        )
+
+    # ── set sources ──────────────────────────────────────────────────
+
     def set_sources(self, sources: list):
-        """Update source list. sources: [{source_file, content}, ...]."""
+        """Update source list.
+
+        sources: [{source_file, heading, content, score}, ...]
+        """
         while self._list_layout.count():
             item = self._list_layout.takeAt(0)
             if item.widget():
@@ -79,13 +126,17 @@ class SourcePanel(QWidget):
 
         seen = set()
         for s in sources:
-            src = s.get("source_file", self._i18n.t("source.unknown"))
+            src = s.get("source_file", "")
             if src in seen:
                 continue
             seen.add(src)
 
+            heading = s.get("heading", "")
             content = s.get("content", "")[:100]
+            score = s.get("score", 0.0)
+            pct = self._score_pct(score)
 
+            # ── Card ──
             card = QFrame()
             card.setStyleSheet("""
                 QFrame {
@@ -98,14 +149,40 @@ class SourcePanel(QWidget):
             card_layout.setContentsMargins(10, 8, 10, 8)
             card_layout.setSpacing(4)
 
-            src_lbl = QLabel(src[:50])
-            src_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #2D3436;")
-            src_lbl.setWordWrap(True)
-            card_layout.addWidget(src_lbl)
+            # Row 1: File name (bold)
+            file_lbl = QLabel(self._short_name(src))
+            file_lbl.setStyleSheet(
+                "font-size: 12px; font-weight: 600; color: #2D3436;"
+            )
+            file_lbl.setWordWrap(True)
+            card_layout.addWidget(file_lbl)
 
+            # Row 2: Chapter heading (if any)
+            if heading:
+                ch_lbl = QLabel(
+                    self._i18n.t("source.chapter_label",
+                                 heading=heading)
+                )
+                ch_lbl.setStyleSheet("font-size: 11px; color: #636E72;")
+                ch_lbl.setWordWrap(True)
+                card_layout.addWidget(ch_lbl)
+
+            # Row 3: Match score bar
+            score_lbl = QLabel()
+            score_lbl.setTextFormat(Qt.RichText)
+            score_lbl.setText(
+                self._i18n.t("source.score_label") + " " + self._score_bar_html(pct)
+            )
+            score_lbl.setStyleSheet("font-size: 11px; color: #636E72;")
+            card_layout.addWidget(score_lbl)
+
+            # Row 4: Content preview
             if content:
                 content_lbl = QLabel(content)
-                content_lbl.setStyleSheet("font-size: 11px; color: #636E72;")
+                content_lbl.setStyleSheet(
+                    "font-size: 11px; color: #A0AEC0;"
+                    "border-top: 1px solid #E8ECF0; padding-top: 4px;"
+                )
                 content_lbl.setWordWrap(True)
                 card_layout.addWidget(content_lbl)
 

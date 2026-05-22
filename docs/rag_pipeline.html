@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>LocalKB RAG Pipeline</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1440px; overflow: hidden;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: #faf9f6;
+  color: #2d2d3a;
+  display: flex; flex-direction: column;
+  padding: 52px 64px;
+}
+.header { text-align: center; margin-bottom: 30px; }
+.header h1 {
+  font-size: 50px; font-weight: 900;
+  color: #1a1a2e;
+}
+.header .line {
+  width: 80px; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, #27ae60, #4a90d9, #7c5ce0);
+  margin: 14px auto 0;
+}
+.header .sub { font-size: 18px; color: #999; margin-top: 10px; }
+
+.pipeline { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+
+.step {
+  display: flex; align-items: center; gap: 24px;
+  padding: 24px 36px; border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  border-left: 5px solid transparent;
+}
+.step:nth-child(1) { border-left-color: #4a90d9; }
+.step:nth-child(3) { border-left-color: #27ae60; }
+.step:nth-child(5) { border-left-color: #7c5ce0; }
+.step:nth-child(7) { border-left-color: #e8913a; }
+
+.step-num {
+  font-size: 42px; font-weight: 900; min-width: 70px; text-align: center;
+  color: #ccc;
+}
+.step-info { flex: 1; }
+.step-info h3 { font-size: 26px; font-weight: 700; margin-bottom: 6px; color: #1a1a2e; }
+.step-info p { font-size: 16px; color: #777; line-height: 1.7; }
+
+.step-arrow { display: flex; justify-content: center; }
+.step-arrow span { font-size: 22px; color: #d0d0d8; }
+
+.highlight-box {
+  margin-top: 24px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 16px; padding: 24px 32px;
+  display: flex; gap: 46px; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+}
+.highlight-item { text-align: center; }
+.highlight-item .label { font-size: 15px; color: #aaa; margin-bottom: 6px; }
+.highlight-item .val { font-size: 26px; font-weight: 700; }
+.val.c1 { color: #4a90d9; }
+.val.c2 { color: #27ae60; }
+.val.c3 { color: #7c5ce0; }
+.val.c4 { color: #e8913a; }
+
+.footer { text-align: center; margin-top: 26px; font-size: 18px; color: #bbb; }
+.footer b { color: #4a90d9; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>RAG 检索增强生成流程</h1>
+  <div class="line"></div>
+  <div class="sub">从提问到回答，四步走通</div>
+</div>
+
+<div class="pipeline">
+
+  <div class="step">
+    <div class="step-num">01</div>
+    <div class="step-info">
+      <h3>📥 文档导入 & 向量化</h3>
+      <p>上传 Markdown / PDF / DOCX / PPT 等文档，自动解析、结构切片，BGE-M3 生成稠密 + 稀疏双向量，存入 Qdrant。</p>
+    </div>
+  </div>
+
+  <div class="step-arrow"><span>▼</span></div>
+
+  <div class="step">
+    <div class="step-num">02</div>
+    <div class="step-info">
+      <h3>🔍 混合检索</h3>
+      <p>同时进行稠密语义搜索 + 稀疏关键词搜索（BM25 词法权重），Qdrant 内置 RRF 算法融合排序，可选 Cross-encoder 二次重排。</p>
+    </div>
+  </div>
+
+  <div class="step-arrow"><span>▼</span></div>
+
+  <div class="step">
+    <div class="step-num">03</div>
+    <div class="step-info">
+      <h3>📋 上下文构建</h3>
+      <p>检索到的 Top-K 片段 + System Prompt + 多轮对话历史 → 拼接为完整上下文，注入 LLM 请求。</p>
+    </div>
+  </div>
+
+  <div class="step-arrow"><span>▼</span></div>
+
+  <div class="step">
+    <div class="step-num">04</div>
+    <div class="step-info">
+      <h3>🤖 LLM 生成答案</h3>
+      <p>通过 OpenAI 兼容 API 调用大模型（DeepSeek / GPT-4o / 自定义），基于参考材料流式生成回答，附带引用来源。</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="highlight-box">
+  <div class="highlight-item">
+    <div class="label">检索策略</div>
+    <div class="val c1">稠密 + 稀疏</div>
+  </div>
+  <div class="highlight-item">
+    <div class="label">融合算法</div>
+    <div class="val c2">RRF</div>
+  </div>
+  <div class="highlight-item">
+    <div class="label">查询增强</div>
+    <div class="val c3">HyDE</div>
+  </div>
+  <div class="highlight-item">
+    <div class="label">重排序</div>
+    <div class="val c4">Cross-encoder</div>
+  </div>
+</div>
+
+<div class="footer">
+  📌 全程<b>本地运行</b> · 你的数据<b>永不离开你的电脑</b>
+</div>
+
+</body>
+</html>

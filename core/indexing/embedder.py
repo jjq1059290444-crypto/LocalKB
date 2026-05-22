@@ -11,6 +11,7 @@ embed_dense(texts, model_name, dim)   → np.ndarray
 embed_sparse(texts, model_name)       → list[dict[str, float]]
 embed_both(texts, model_name, dim)    → (dense_ndarray, list[dict])
 embed_dim(model_name)                 → int
+warmup_model(model_name)              → None (load & cache in current thread)
 """
 
 from typing import Optional
@@ -40,13 +41,21 @@ def embed_dense(texts: list[str],
                 batch_size: int = 32) -> np.ndarray:
     """Encode texts into dense vectors, optionally with Matryoshka truncation.
 
-    Args:
-        texts: list of input strings.
-        model_name: HuggingFace model ID.
-        matryoshka_dim: if set, truncate output to this many dimensions.
-            Useful for BGE-M3 which supports 1024 → 768 / 512 / 256.
-        batch_size: encoding batch size.
+    For sparse-capable models (BGE-M3), delegates to embed_both to avoid
+    loading two separate model backends (SentenceTransformer + FlagEmbedding)
+    for the same model, which can cause memory exhaustion and crashes.
     """
+    # ── BGE-M3 / sparse-capable → use FlagEmbedding (dense + sparse in one model) ──
+    if supports_sparse(model_name):
+        dense, _sparse = embed_both(
+            texts,
+            model_name=model_name,
+            matryoshka_dim=matryoshka_dim,
+            batch_size=batch_size,
+        )
+        return dense
+
+    # ── Other models → SentenceTransformer ──
     model = _load_st(model_name)
     embeddings = model.encode(
         texts,
@@ -126,6 +135,24 @@ def embed_dim(model_name: str = "BAAI/bge-small-zh-v1.5") -> int:
     return model.get_sentence_embedding_dimension()
 
 
+def warmup_model(model_name: str) -> None:
+    """Load and cache the embedding model in the *current* thread.
+
+    Call this from the main thread BEFORE starting a background QThread
+    that will use the model. PyTorch/FlagEmbedding model loading is not
+    thread-safe and can segfault (~50% crash rate) when called from a
+    background thread. Loading from the main thread avoids that race.
+    Subsequent calls are a no-op (model is cached at module level).
+    """
+    import time as _time
+    if supports_sparse(model_name):
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Embedder: warmup FlagEmbedding...", flush=True)
+        _load_flag(model_name)
+    else:
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Embedder: warmup SentenceTransformer...", flush=True)
+        _load_st(model_name)
+
+
 def supports_sparse(model_name: str) -> bool:
     """Whether this model can output sparse lexical weights."""
     # BGE-M3 is the only model we know supports sparse natively
@@ -154,7 +181,15 @@ def _load_flag(model_name: str):
     global _FLAG_MODEL, _FLAG_NAME
     if _FLAG_MODEL is not None and _FLAG_NAME == model_name:
         return _FLAG_MODEL
-    from FlagEmbedding import BGEM3FlagModel
-    _FLAG_MODEL = BGEM3FlagModel(model_name, use_fp16=True)
-    _FLAG_NAME = model_name
-    return _FLAG_MODEL
+    import time as _time
+    print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Embedder: loading FlagEmbedding ({model_name})...", flush=True)
+    t0 = _time.perf_counter()
+    try:
+        from FlagEmbedding import BGEM3FlagModel
+        _FLAG_MODEL = BGEM3FlagModel(model_name, use_fp16=False)
+        _FLAG_NAME = model_name
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Embedder: FlagEmbedding loaded ({_time.perf_counter() - t0:.1f}s)", flush=True)
+        return _FLAG_MODEL
+    except Exception as e:
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Embedder: FlagEmbedding load FAILED: {e}", flush=True)
+        raise

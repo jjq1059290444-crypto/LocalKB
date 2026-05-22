@@ -15,6 +15,7 @@ def build_messages(system_prompt: str, question: str,
     Returns:
         list of {"role": ..., "content": ...} dicts for OpenAI API.
     """
+    import time as _time
     context_text = _build_context(context_chunks)
 
     user_content = (
@@ -31,6 +32,16 @@ def build_messages(system_prompt: str, question: str,
         messages.extend(history)
 
     messages.append({"role": "user", "content": user_content})
+
+    # Debug: estimate total chars
+    total_chars = sum(len(m.get("content", "")) for m in messages)
+    history_turns = len(history) // 2 if history else 0
+    print(
+        f"[DEBUG {_time.strftime('%H:%M:%S')}] Context: "
+        f"{len(context_chunks)} chunks + {history_turns} history turns "
+        f"= ~{total_chars} chars total",
+        flush=True,
+    )
     return messages
 
 

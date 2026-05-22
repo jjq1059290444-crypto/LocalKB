@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>LocalKB Architecture</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1440px; overflow: hidden;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: #faf9f6;
+  color: #2d2d3a;
+  display: flex; flex-direction: column;
+  padding: 56px 68px;
+}
+.header { text-align: center; margin-bottom: 42px; }
+.header h1 {
+  font-size: 54px; font-weight: 900;
+  color: #1a1a2e; letter-spacing: 3px;
+}
+.header .line {
+  width: 80px; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, #4a90d9, #7c5ce0);
+  margin: 16px auto 0;
+}
+.header .sub {
+  font-size: 20px; color: #888; margin-top: 14px; letter-spacing: 6px;
+}
+
+.diagram { flex: 1; display: flex; flex-direction: column; gap: 24px; }
+
+.layer-top { display: flex; justify-content: center; }
+.box-user {
+  background: linear-gradient(135deg, #4a90d9, #6c5ce7);
+  color: #fff;
+  border-radius: 22px; padding: 26px 76px;
+  font-size: 30px; font-weight: 700;
+  box-shadow: 0 6px 28px rgba(74,144,217,0.25);
+}
+
+.arrow-down { display: flex; justify-content: center; padding: 2px 0; }
+.arrow-down span { font-size: 26px; color: #c0bed6; }
+
+.layer-mid { display: flex; justify-content: center; gap: 36px; }
+.card {
+  border-radius: 18px; padding: 30px 26px; text-align: center;
+  flex: 1; max-width: 280px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+}
+.card h3 { font-size: 24px; font-weight: 700; margin-bottom: 12px; }
+.card p { font-size: 15px; color: #666; line-height: 1.8; }
+.card-icon { font-size: 38px; margin-bottom: 10px; }
+
+.card-gui { background: #f0f4ff; border: 1px solid #dce6fa; }
+.card-gui h3 { color: #4a90d9; }
+.card-qa { background: #f5f0ff; border: 1px solid #e6dcfa; }
+.card-qa h3 { color: #7c5ce0; }
+.card-ret { background: #effaf5; border: 1px solid #d4f0e3; }
+.card-ret h3 { color: #27ae60; }
+
+.layer-bottom { display: flex; justify-content: center; gap: 32px; }
+.card-storage {
+  background: #fffefb; border: 1px solid #f0e8d8; border-radius: 18px;
+  text-align: center; padding: 26px 34px; min-width: 260px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.card-storage h3 { font-size: 22px; color: #e8913a; margin-bottom: 12px; }
+.card-storage .items { font-size: 15px; color: #666; line-height: 2.1; }
+
+.llm-bar {
+  display: flex; justify-content: center; gap: 56px;
+  background: #fff; border: 1px solid #eee; border-radius: 18px;
+  padding: 22px 40px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.llm-item { text-align: center; }
+.llm-item .name { font-size: 22px; font-weight: 700; color: #2d2d3a; }
+.llm-item .desc { font-size: 14px; color: #999; margin-top: 4px; }
+
+.footer {
+  text-align: center; margin-top: 26px;
+  font-size: 17px; color: #aaa;
+}
+.footer span { color: #4a90d9; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>LocalKB 系统架构</h1>
+  <div class="line"></div>
+  <div class="sub">本地知识库问答系统</div>
+</div>
+
+<div class="diagram">
+
+  <div class="layer-top">
+    <div class="box-user">👤 用户桌面应用</div>
+  </div>
+
+  <div class="arrow-down"><span>▼</span></div>
+
+  <div class="layer-mid">
+    <div class="card card-gui">
+      <div class="card-icon">🖥️</div>
+      <h3>GUI 界面</h3>
+      <p>PySide6 桌面应用<br>对话 · 知识库管理<br>设置 · API 配置<br>首次启动引导向导</p>
+    </div>
+    <div class="card card-qa">
+      <div class="card-icon">🧠</div>
+      <h3>QA 引擎</h3>
+      <p>HyDE 查询扩展<br>多轮对话 Session<br>流式输出<br>历史记录</p>
+    </div>
+    <div class="card card-ret">
+      <div class="card-icon">🔍</div>
+      <h3>检索层</h3>
+      <p>稠密向量 · 稀疏词法<br>RRF 融合排序<br>Cross-encoder 重排<br>Top-K 筛选</p>
+    </div>
+  </div>
+
+  <div class="arrow-down"><span>▼</span></div>
+
+  <div class="layer-bottom">
+    <div class="card-storage">
+      <h3>🗄️ Qdrant 向量库</h3>
+      <div class="items">
+        嵌入式引擎 (Rust + RocksDB)<br>
+        稠密向量 · 稀疏向量<br>
+        本地文件存储 · 零依赖
+      </div>
+    </div>
+    <div class="card-storage">
+      <h3>🤖 嵌入模型</h3>
+      <div class="items">
+        BGE-M3 (1024d + 稀疏)<br>
+        bge-small-zh-v1.5 (512d)<br>
+        内置默认 · 即开即用
+      </div>
+    </div>
+    <div class="card-storage">
+      <h3>📄 文档存储</h3>
+      <div class="items">
+        MD / TXT / PDF<br>
+        DOCX / PPT / PPTX<br>
+        结构切片 · 增量扫描
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down"><span>▼</span></div>
+
+  <div class="llm-bar">
+    <div class="llm-item">
+      <div class="name">🤖 DeepSeek</div>
+      <div class="desc">默认推荐</div>
+    </div>
+    <div class="llm-item">
+      <div class="name">🧩 OpenAI</div>
+      <div class="desc">GPT-4o</div>
+    </div>
+    <div class="llm-item">
+      <div class="name">🔌 自定义</div>
+      <div class="desc">任意兼容 API</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  🏠 完全本地运行 &nbsp;|&nbsp; 🔒 数据不出设备 &nbsp;|&nbsp; 🌐 <span>OpenAI 兼容 API</span>
+</div>
+
+</body>
+</html>

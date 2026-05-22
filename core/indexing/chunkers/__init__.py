@@ -1,7 +1,17 @@
 """chunkers/__init__.py — chunking strategy registry."""
 
+import re
+
 from .structural_chunker import chunk_structural
 from .semantic_chunker import chunk_semantic
+
+_HEADING_RE = re.compile(r'^##\s+(.+)$', re.MULTILINE)
+
+
+def extract_heading(text: str) -> str:
+    """Extract the first H2 heading from chunk text."""
+    m = _HEADING_RE.search(text)
+    return m.group(1).strip() if m else ""
 
 CHUNKERS = {
     "structural": chunk_structural,

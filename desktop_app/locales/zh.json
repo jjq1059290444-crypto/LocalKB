@@ -82,6 +82,9 @@
     "hyde": "HyDE",
     "hyde_desc": "生成假设性答案以提升检索命中率",
     "max_history": "对话历史轮数",
+    "conversation_mode": "默认对话模式",
+    "conversation_mode_single": "单轮对话",
+    "conversation_mode_multi": "多轮对话",
     "restore_default": "恢复默认",
     "save": "保存设置",
     "saved_title": "已保存",
@@ -89,7 +92,12 @@
     "restart_title": "需要重启",
     "restart_msg": "嵌入模型已从「{old}」切换为「{new}」。\n\n向量数据库需要以新维度重建才能正常使用。\n是否立即重启应用？",
     "restart_now": "立即重启",
-    "restart_later": "稍后重启"
+    "restart_later": "稍后重启",
+    "embed_builtin": "内置，轻量",
+    "embed_en": "英文",
+    "embed_multi": "多语言",
+    "embed_downloaded": "已下载",
+    "embed_need_download": "需下载"
   },
   "api": {
     "title": "API 配置",
@@ -136,7 +144,9 @@
     "title": "参考来源",
     "empty_hint": "提问后此处显示参考来源",
     "no_sources": "暂无参考来源",
-    "unknown": "未知来源"
+    "unknown": "未知来源",
+    "chapter_label": "📂 {heading}",
+    "score_label": "🎯 匹配度"
   },
   "history": {
     "title": "历史记录",
@@ -144,7 +154,9 @@
   },
   "input": {
     "send": "发送",
-    "placeholder": "输入问题，按 Ctrl+Enter 发送…"
+    "placeholder": "输入问题，按 Ctrl+Enter 发送…",
+    "single_turn": "单轮",
+    "multi_turn": "多轮"
   },
   "index": {
     "import_error": "核心模块导入失败：{detail}",

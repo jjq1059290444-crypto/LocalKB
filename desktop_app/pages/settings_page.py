@@ -40,41 +40,88 @@ class SettingsPage(QWidget):
 
         # ── Retrieval settings ──
         self._ret_group = QGroupBox()
-        ret_layout = QVBoxLayout(self._ret_group)
-        ret_layout.setSpacing(14)
+        ret_layout = QHBoxLayout(self._ret_group)
+        ret_layout.setSpacing(24)
 
-        # top_k
-        topk_row = QHBoxLayout()
-        self._topk_lbl = QLabel()
-        self._topk_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
-        topk_row.addWidget(self._topk_lbl)
+        # ── Common styles ──
+        _LBL = "font-size: 13px; color: #636E72; min-width: 100px;"
+        _CMB = """
+            QComboBox {
+                background: #FFFFFF; border: 1px solid #DFE6E9;
+                border-radius: 8px; padding: 6px 10px; font-size: 13px;
+                min-width: 240px;
+            }
+        """
+        _SPN = """
+            QSpinBox {
+                background: #FFFFFF; border: 1px solid #DFE6E9;
+                border-radius: 8px; padding: 6px 10px; font-size: 14px;
+                min-width: 100px;
+            }
+        """
+
+        def _row(lbl, widget, stretch=True):
+            row = QHBoxLayout()
+            row.setSpacing(8)
+            l = QLabel()
+            l.setStyleSheet(_LBL)
+            row.addWidget(l)
+            row.addWidget(widget, 1)
+            if stretch:
+                row.addStretch()
+            return row, l
+
+        # ── Left column ──
+        left = QVBoxLayout()
+        left.setSpacing(12)
 
         self._topk_spin = QSpinBox()
         self._topk_spin.setRange(1, 20)
         self._topk_spin.setValue(10)
-        self._topk_spin.setStyleSheet("""
-            QSpinBox {
-                background: #FFFFFF; border: 1px solid #DFE6E9;
-                border-radius: 8px; padding: 6px 10px; font-size: 14px;
-            }
-        """)
-        topk_row.addWidget(self._topk_spin)
-        topk_row.addStretch()
-        ret_layout.addLayout(topk_row)
+        self._topk_spin.setStyleSheet(_SPN)
+        r, self._topk_lbl = _row("", self._topk_spin)
+        left.addLayout(r)
 
-        # temperature
+        self._embed_combo = QComboBox()
+        for key in EMBED_MODELS:
+            self._embed_combo.addItem(key, key)
+        self._embed_combo.setStyleSheet(_CMB)
+        self._embed_combo.currentIndexChanged.connect(self._on_embed_changed)
+        r, self._embed_lbl = _row("", self._embed_combo)
+        left.addLayout(r)
+        self._refresh_embed_combo_labels()
+
+        self._matryoshka_combo = QComboBox()
+        self._matryoshka_combo.addItem("Full (no truncation)", 0)
+        self._matryoshka_combo.setStyleSheet(_CMB)
+        r, self._matryoshka_lbl = _row("", self._matryoshka_combo)
+        left.addLayout(r)
+
+        self._chunk_combo = QComboBox()
+        for key, label in CHUNK_STRATEGIES.items():
+            self._chunk_combo.addItem(label, key)
+        self._chunk_combo.setStyleSheet(_CMB)
+        r, self._chunk_lbl = _row("", self._chunk_combo)
+        left.addLayout(r)
+
+        left.addStretch()
+        ret_layout.addLayout(left)
+
+        # ── Right column ──
+        right = QVBoxLayout()
+        right.setSpacing(12)
+
         temp_row = QHBoxLayout()
+        temp_row.setSpacing(8)
         self._temp_lbl = QLabel()
-        self._temp_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
+        self._temp_lbl.setStyleSheet(_LBL)
         temp_row.addWidget(self._temp_lbl)
-
         self._temp_slider = QSlider(Qt.Horizontal)
         self._temp_slider.setRange(0, 20)
         self._temp_slider.setValue(3)
         self._temp_slider.setTickPosition(QSlider.TicksBelow)
         self._temp_slider.setTickInterval(2)
         temp_row.addWidget(self._temp_slider, 1)
-
         self._temp_val = QLabel("0.3")
         self._temp_val.setStyleSheet(
             "font-size: 14px; font-weight: 600; color: #4A90D9; min-width: 36px;"
@@ -84,110 +131,34 @@ class SettingsPage(QWidget):
             lambda v: self._temp_val.setText(f"{v / 10:.1f}")
         )
         temp_row.addWidget(self._temp_val)
-        ret_layout.addLayout(temp_row)
-
-        # Embed model selector
-        embed_row = QHBoxLayout()
-        self._embed_lbl = QLabel()
-        self._embed_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
-        embed_row.addWidget(self._embed_lbl)
-
-        self._embed_combo = QComboBox()
-        for key in EMBED_MODELS:
-            self._embed_combo.addItem(key, key)
-        self._embed_combo.setStyleSheet("""
-            QComboBox {
-                background: #FFFFFF; border: 1px solid #DFE6E9;
-                border-radius: 8px; padding: 6px 10px; font-size: 13px;
-                min-width: 220px;
-            }
-        """)
-        self._embed_combo.currentIndexChanged.connect(self._on_embed_changed)
-        embed_row.addWidget(self._embed_combo, 1)
-        embed_row.addStretch()
-        ret_layout.addLayout(embed_row)
-
-        # Matryoshka dimension selector
-        matryoshka_row = QHBoxLayout()
-        self._matryoshka_lbl = QLabel()
-        self._matryoshka_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
-        matryoshka_row.addWidget(self._matryoshka_lbl)
-
-        self._matryoshka_combo = QComboBox()
-        self._matryoshka_combo.addItem("Full (no truncation)", 0)
-        self._matryoshka_combo.setStyleSheet("""
-            QComboBox {
-                background: #FFFFFF; border: 1px solid #DFE6E9;
-                border-radius: 8px; padding: 6px 10px; font-size: 13px;
-                min-width: 220px;
-            }
-        """)
-        matryoshka_row.addWidget(self._matryoshka_combo, 1)
-        matryoshka_row.addStretch()
-        ret_layout.addLayout(matryoshka_row)
-
-        # Chunking strategy selector
-        chunk_row = QHBoxLayout()
-        self._chunk_lbl = QLabel()
-        self._chunk_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
-        chunk_row.addWidget(self._chunk_lbl)
-
-        self._chunk_combo = QComboBox()
-        for key, label in CHUNK_STRATEGIES.items():
-            self._chunk_combo.addItem(label, key)
-        self._chunk_combo.setStyleSheet("""
-            QComboBox {
-                background: #FFFFFF; border: 1px solid #DFE6E9;
-                border-radius: 8px; padding: 6px 10px; font-size: 13px;
-                min-width: 220px;
-            }
-        """)
-        chunk_row.addWidget(self._chunk_combo, 1)
-        chunk_row.addStretch()
-        ret_layout.addLayout(chunk_row)
-
-        # Reranker toggle
-        rerank_row = QHBoxLayout()
-        self._rerank_lbl = QLabel()
-        self._rerank_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
-        rerank_row.addWidget(self._rerank_lbl)
+        right.addLayout(temp_row)
 
         self._rerank_check = QCheckBox()
         self._rerank_check.setStyleSheet("font-size: 13px; color: #636E72;")
-        rerank_row.addWidget(self._rerank_check)
-        rerank_row.addStretch()
-        ret_layout.addLayout(rerank_row)
-
-        # HyDE toggle
-        hyde_row = QHBoxLayout()
-        self._hyde_lbl = QLabel()
-        self._hyde_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
-        hyde_row.addWidget(self._hyde_lbl)
+        r, self._rerank_lbl = _row("", self._rerank_check)
+        right.addLayout(r)
 
         self._hyde_check = QCheckBox()
         self._hyde_check.setStyleSheet("font-size: 13px; color: #636E72;")
-        hyde_row.addWidget(self._hyde_check)
-        hyde_row.addStretch()
-        ret_layout.addLayout(hyde_row)
+        r, self._hyde_lbl = _row("", self._hyde_check)
+        right.addLayout(r)
 
-        # Max history turns
-        hist_row = QHBoxLayout()
-        self._hist_lbl = QLabel()
-        self._hist_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
-        hist_row.addWidget(self._hist_lbl)
+        self._conv_combo = QComboBox()
+        self._conv_combo.addItem(self._i18n.t("settings.conversation_mode_single"), "single")
+        self._conv_combo.addItem(self._i18n.t("settings.conversation_mode_multi"), "multi")
+        self._conv_combo.setStyleSheet(_CMB)
+        r, self._conv_lbl = _row("", self._conv_combo)
+        right.addLayout(r)
 
         self._hist_spin = QSpinBox()
         self._hist_spin.setRange(0, 20)
         self._hist_spin.setValue(6)
-        self._hist_spin.setStyleSheet("""
-            QSpinBox {
-                background: #FFFFFF; border: 1px solid #DFE6E9;
-                border-radius: 8px; padding: 6px 10px; font-size: 14px;
-            }
-        """)
-        hist_row.addWidget(self._hist_spin)
-        hist_row.addStretch()
-        ret_layout.addLayout(hist_row)
+        self._hist_spin.setStyleSheet(_SPN)
+        r, self._hist_lbl = _row("", self._hist_spin)
+        right.addLayout(r)
+
+        right.addStretch()
+        ret_layout.addLayout(right)
 
         layout.addWidget(self._ret_group)
 
@@ -261,6 +232,7 @@ class SettingsPage(QWidget):
         self._hyde_lbl.setText(self._i18n.t("settings.hyde"))
         self._hyde_check.setText(self._i18n.t("settings.hyde_desc"))
         self._hist_lbl.setText(self._i18n.t("settings.max_history"))
+        self._conv_lbl.setText(self._i18n.t("settings.conversation_mode"))
         self._prompt_group.setTitle(self._i18n.t("settings.system_prompt"))
         self._prompt_desc.setText(self._i18n.t("settings.prompt_desc"))
         self._reset_btn.setText(self._i18n.t("settings.restore_default"))
@@ -281,6 +253,11 @@ class SettingsPage(QWidget):
         self._hyde_check.setChecked(config.get("hyde_enabled", False))
         self._hist_spin.setValue(config.get("max_history_turns", 6))
 
+        conv_mode = config.get("conversation_mode", "single")
+        cidx = self._conv_combo.findData(conv_mode)
+        if cidx >= 0:
+            self._conv_combo.setCurrentIndex(cidx)
+
         chunk_strategy = config.get("chunking_strategy", "structural")
         cidx = self._chunk_combo.findData(chunk_strategy)
         if cidx >= 0:
@@ -291,11 +268,13 @@ class SettingsPage(QWidget):
         if midx >= 0:
             self._matryoshka_combo.setCurrentIndex(midx)
 
-        # Refresh matryoshka options for the current embed model
+        # Refresh matryoshka options and embed labels for the current embed model
         self._refresh_matryoshka_options()
+        self._refresh_embed_combo_labels()
 
     def _on_embed_changed(self):
         self._refresh_matryoshka_options()
+        self._refresh_embed_combo_labels()
 
     def _refresh_matryoshka_options(self):
         """Rebuild matryoshka dropdown based on selected embed model."""
@@ -305,12 +284,46 @@ class SettingsPage(QWidget):
         self._matryoshka_combo.clear()
         dims = info.get("matryoshka") if info else None
         if dims:
+            _matryoshka_notes = {
+                1024: "1024（完整）",
+                768:  "768",
+                512:  "512（轻量）",
+                256:  "256（最快）",
+            }
             for d in dims:
-                self._matryoshka_combo.addItem(str(d), d)
+                label = _matryoshka_notes.get(d, str(d))
+                self._matryoshka_combo.addItem(label, d)
         else:
             self._matryoshka_combo.addItem(
                 self._i18n.t("settings.matryoshka_na"), 0
             )
+
+    def _refresh_embed_combo_labels(self):
+        """Add download-status notes to each embed model combo item."""
+        from core.paths import MODELS_DIR
+
+        _notes = {
+            "bge-small-zh-v1.5": self._i18n.t("settings.embed_builtin"),
+            "all-MiniLM-L6-v2": self._i18n.t("settings.embed_en"),
+            "bge-m3":            self._i18n.t("settings.embed_multi"),
+        }
+
+        for i in range(self._embed_combo.count()):
+            key = self._embed_combo.itemData(i)
+            info = EMBED_MODELS.get(key, {})
+            model_name = info.get("name", "")
+            local_name = model_name.replace("/", "_")
+            local_dir = MODELS_DIR / local_name
+            is_downloaded = local_dir.exists() and (local_dir / "config.json").exists()
+
+            note = _notes.get(key, "")
+            if is_downloaded:
+                status = self._i18n.t("settings.embed_downloaded")
+            else:
+                status = self._i18n.t("settings.embed_need_download")
+
+            display = f"{key}  |  {note}{status}"
+            self._embed_combo.setItemText(i, display)
 
     def _on_reset(self):
         from config.manager import DEFAULT_CONFIG
@@ -320,6 +333,10 @@ class SettingsPage(QWidget):
         self._rerank_check.setChecked(DEFAULT_CONFIG.get("use_reranker", False))
         self._hyde_check.setChecked(DEFAULT_CONFIG.get("hyde_enabled", False))
         self._hist_spin.setValue(DEFAULT_CONFIG.get("max_history_turns", 6))
+
+        cidx = self._conv_combo.findData(DEFAULT_CONFIG.get("conversation_mode", "single"))
+        if cidx >= 0:
+            self._conv_combo.setCurrentIndex(cidx)
 
         cidx = self._chunk_combo.findData(DEFAULT_CONFIG.get("chunking_strategy", "structural"))
         if cidx >= 0:
@@ -343,6 +360,7 @@ class SettingsPage(QWidget):
         config["use_reranker"] = self._rerank_check.isChecked()
         config["hyde_enabled"] = self._hyde_check.isChecked()
         config["max_history_turns"] = self._hist_spin.value()
+        config["conversation_mode"] = self._conv_combo.currentData()
         config["chunking_strategy"] = self._chunk_combo.currentData()
         config["matryoshka_dim"] = self._matryoshka_combo.currentData()
         self._config_mgr.save(config)

@@ -119,6 +119,8 @@ def chunk_late(doc: dict) -> list[dict]:
             chunks.append(seg)
         start = bp
 
+    from . import extract_heading
+
     total = len(chunks)
     results = []
     for i, text in enumerate(chunks):
@@ -128,6 +130,7 @@ def chunk_late(doc: dict) -> list[dict]:
             "total_chunks": total,
             "char_count": len(text),
             "content": text,
+            "heading": extract_heading(text),
             "md5": _md5(text),
             "chunked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         })

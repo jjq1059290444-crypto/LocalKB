@@ -84,6 +84,10 @@ class ChatPage(QWidget):
 
         self.chat_input = ChatInput(i18n)
         self.chat_input.send_clicked.connect(self._on_send)
+        # Set conversation mode from config
+        self.chat_input.set_conversation_mode(config.get("conversation_mode", "single"))
+        # Clear session history when user toggles between modes
+        self.chat_input.conversation_mode_changed.connect(self._on_conversation_mode_changed)
         center_layout.addWidget(self.chat_input)
 
         splitter.addWidget(center)
@@ -124,6 +128,12 @@ class ChatPage(QWidget):
             )
             return
 
+        import time as _time
+        mode = "single-turn" if self.chat_input.is_single_turn() else "multi-turn"
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] ==== Question ====", flush=True)
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Mode: {mode}", flush=True)
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Question: {text[:200]}", flush=True)
+
         self._add_bubble(text, is_user=True, state="DONE")
         self._current_ai_bubble = self._add_bubble(
             self._i18n.t("chat.thinking"), is_user=False, state="PENDING"
@@ -133,8 +143,23 @@ class ChatPage(QWidget):
         config = self._config_mgr.load()
         top_k = config.get("top_k", 10)
 
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Top-K: {top_k}", flush=True)
+
+        # ── Warm up embed model in MAIN thread (avoids ~50% crash in QThread) ──
+        from config.presets import get_embed_model_path
+        embed_model_name = get_embed_model_path(
+            config.get("embed_model", "bge-small-zh-v1.5")
+        )
+        try:
+            from core.indexing.embedder import warmup_model
+            warmup_model(embed_model_name)
+        except Exception as e:
+            print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Embedder warmup FAILED: {e}", flush=True)
+            self._on_error(str(e))
+            return
+
         self._worker = QAWorker(self.qa_chain, text, top_k=top_k,
-                               session=self._session)
+                               session=self._session if not self.chat_input.is_single_turn() else None)
         self._worker.token_signal.connect(self._on_token)
         self._worker.finished_signal.connect(self._on_answer)
         self._worker.error_signal.connect(self._on_error)
@@ -146,16 +171,26 @@ class ChatPage(QWidget):
         self._scroll_to_bottom()
 
     def _on_answer(self, result: dict):
+        import time as _time
+        _p = lambda msg: print(f"[DEBUG {_time.strftime('%H:%M:%S')}] UI: {msg}", flush=True)
+        _p("_on_answer start")
         answer = result.get("answer", "")
         sources = result.get("sources", [])
+        _p(f"answer len={len(answer)}, sources={len(sources)}")
         answer = self._strip_refs(answer)
+        _p("strip_refs done")
         html = md_render(answer)
+        _p(f"md_render done, html len={len(html)}")
         if self._current_ai_bubble:
             self._current_ai_bubble.set_text(html, state="DONE")
+            _p("set_text done")
         self.source_panel.set_sources(sources)
+        _p("set_sources done")
         self.history_list.refresh()
+        _p("history refresh done")
         self.chat_input.set_enabled(True)
         self.chat_input._input.setFocus()
+        _p("_on_answer end")
 
         self._save_history(result)
 
@@ -209,3 +244,12 @@ class ChatPage(QWidget):
         sb = self._chat_scroll.verticalScrollBar()
         if sb:
             sb.setValue(sb.maximum())
+
+    def _on_conversation_mode_changed(self, checked: bool):
+        """Clear session history when toggling between modes.
+
+        When the user switches from multi to single (or vice versa),
+        we clear the accumulated turns so the next multi-turn session
+        starts fresh. This avoids stale history leaking across mode switches.
+        """
+        self._session.clear()

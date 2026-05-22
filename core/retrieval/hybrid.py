@@ -42,12 +42,37 @@ class HybridRetriever:
         return None
 
     def search(self, query: str, top_k: int = 10) -> list[dict]:
-        # Dense query vector
-        dense_vec = self._embed_dense([query])[0]
+        import time as _time
+        _p = lambda msg: print(
+            f"[DEBUG {_time.strftime('%H:%M:%S')}] Retrieval: {msg}", flush=True
+        )
 
-        # Sparse query vector (if BGE-M3 is available)
-        sparse_list = self._embed_sparse([query])
-        sparse_vec = sparse_list[0] if sparse_list else None
+        _p(f"embedding query ({self.embed_model_name})...")
+        t_emb = _time.perf_counter()
+
+        # ── BGE-M3 / sparse-capable: one call → both vectors ──
+        from core.indexing.embedder import supports_sparse, embed_both
+
+        if supports_sparse(self.embed_model_name):
+            try:
+                dense_arr, sparse_list = embed_both(
+                    [query], model_name=self.embed_model_name,
+                )
+                dense_vec = dense_arr[0]
+                sparse_vec = sparse_list[0] if sparse_list else None
+            except Exception as e:
+                _p(f"embed_both FAILED: {e}")
+                raise
+        else:
+            # ── Other models: dense-only via SentenceTransformer ──
+            try:
+                dense_vec = self._embed_dense([query])[0]
+            except Exception as e:
+                _p(f"dense embedding FAILED: {e}")
+                raise
+            sparse_vec = None
+
+        _p(f"embedded ({_time.perf_counter() - t_emb:.2f}s), sparse={'yes' if sparse_vec else 'no'}")
 
         results = self.store.query(
             dense_vec, top_k=top_k, query_sparse=sparse_vec,
@@ -56,8 +81,11 @@ class HybridRetriever:
         # Optional: re-rank with cross-encoder
         if self._use_reranker and results:
             try:
+                _p("reranking...")
+                t_rerank = _time.perf_counter()
                 from core.retrieval.reranker import rerank
                 results = rerank(query, results, model_name=self._reranker_model)
+                _p(f"reranked ({_time.perf_counter() - t_rerank:.2f}s)")
             except Exception:
                 pass  # graceful degradation
 

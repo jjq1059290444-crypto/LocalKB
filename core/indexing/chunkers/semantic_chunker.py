@@ -132,6 +132,8 @@ def chunk_semantic(doc: dict) -> list[dict]:
             if current.strip():
                 final.append(current.strip())
 
+    from . import extract_heading
+
     total = len(final)
     results = []
     for i, text in enumerate(final):
@@ -141,6 +143,7 @@ def chunk_semantic(doc: dict) -> list[dict]:
             "total_chunks": total,
             "char_count": len(text),
             "content": text,
+            "heading": extract_heading(text),
             "md5": _md5(text),
             "chunked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         })

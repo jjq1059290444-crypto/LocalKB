@@ -104,7 +104,8 @@ class IndexWorker(QThread):
                 ids = [f"{doc['source_file']}_{c['chunk_index']}" for c in chunks]
                 metadatas = [
                     {"source_file": c["source_file"],
-                     "chunk_index": c["chunk_index"]}
+                     "chunk_index": c["chunk_index"],
+                     "heading": c.get("heading", "")}
                     for c in chunks
                 ]
                 self._store.add(

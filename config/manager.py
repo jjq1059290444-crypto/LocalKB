@@ -30,6 +30,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "matryoshka_dim": 0,
     "hyde_enabled": False,
     "max_history_turns": 6,
+    "conversation_mode": "single",
 }
 
 

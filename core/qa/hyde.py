@@ -44,6 +44,9 @@ def expand_query(question: str, llm,
     Returns:
         A string of generated text suitable for embedding.
     """
+    import time as _time
+    print(f"[DEBUG {_time.strftime('%H:%M:%S')}] HyDE: question: {question[:120]}", flush=True)
+
     template = prompt_template or _HYDE_PROMPT
     prompt_text = template.format(question=question)
 
@@ -53,12 +56,15 @@ def expand_query(question: str, llm,
     try:
         for token in llm.stream_chat(messages, temperature=0.1):
             parts.append(token)
-    except Exception:
+    except Exception as e:
         # If LLM fails, fall back to the raw question
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] HyDE: LLM failed ({e}), fallback to raw question", flush=True)
         return question
 
     hypothetical = "".join(parts).strip()
     if not hypothetical:
+        print(f"[DEBUG {_time.strftime('%H:%M:%S')}] HyDE: empty result, fallback to raw question", flush=True)
         return question
 
+    print(f"[DEBUG {_time.strftime('%H:%M:%S')}] HyDE: generated {len(hypothetical)} chars", flush=True)
     return hypothetical

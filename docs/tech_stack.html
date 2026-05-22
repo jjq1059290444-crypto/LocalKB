@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>LocalKB Tech Stack</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1440px; overflow: hidden;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: #faf9f6;
+  color: #2d2d3a;
+  display: flex; flex-direction: column;
+  padding: 50px 64px;
+}
+.header { text-align: center; margin-bottom: 24px; }
+.header h1 {
+  font-size: 48px; font-weight: 900;
+  color: #1a1a2e;
+}
+.header .line {
+  width: 80px; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, #e8913a, #f0c040);
+  margin: 12px auto 0;
+}
+.header .tag {
+  display: inline-block; margin-top: 12px;
+  padding: 7px 24px; border-radius: 24px;
+  background: #fff; border: 1px solid #eee;
+  font-size: 18px; color: #c0a060; letter-spacing: 2px;
+}
+
+.grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: center; }
+
+.tile {
+  background: #fff; border-radius: 16px; padding: 24px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  border-top: 4px solid #eee;
+}
+.tile .icon { font-size: 34px; margin-bottom: 4px; }
+.tile h3 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+.tile .items { font-size: 15px; color: #777; line-height: 1.9; }
+
+.tile.t1 { border-top-color: #4a90d9; } .tile.t1 h3 { color: #4a90d9; }
+.tile.t2 { border-top-color: #27ae60; } .tile.t2 h3 { color: #27ae60; }
+.tile.t3 { border-top-color: #7c5ce0; } .tile.t3 h3 { color: #7c5ce0; }
+.tile.t4 { border-top-color: #e8913a; } .tile.t4 h3 { color: #e8913a; }
+.tile.t5 { border-top-color: #e8608a; } .tile.t5 h3 { color: #e8608a; }
+.tile.t6 { border-top-color: #3db5b0; } .tile.t6 h3 { color: #3db5b0; }
+
+.oss-bar {
+  margin-top: 20px; display: flex; justify-content: center; gap: 48px;
+  background: #fff; border: 1px solid #eee; border-radius: 16px;
+  padding: 20px 28px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+.oss-item { text-align: center; }
+.oss-item .key { font-size: 26px; font-weight: 700; color: #2d2d3a; }
+.oss-item .val { font-size: 14px; color: #aaa; margin-top: 2px; }
+
+.footer {
+  text-align: center; margin-top: 18px;
+  font-size: 17px; color: #bbb; letter-spacing: 1px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>技术栈 & 核心特性</h1>
+  <div class="line"></div>
+  <div class="tag">PYTHON · RUST · AI</div>
+</div>
+
+<div class="grid">
+  <div class="tile t1">
+    <div class="icon">🖥️</div>
+    <h3>GUI 框架</h3>
+    <div class="items">PySide6 桌面应用<br>现代扁平化浅色主题<br>首次启动引导向导<br>完整 i18n 中英双语</div>
+  </div>
+  <div class="tile t2">
+    <div class="icon">🗄️</div>
+    <h3>向量数据库</h3>
+    <div class="items">Qdrant Embedded<br>Rust 引擎 + RocksDB<br>稠密 & 稀疏双向量<br>内置 RRF 融合排序</div>
+  </div>
+  <div class="tile t3">
+    <div class="icon">🧠</div>
+    <h3>嵌入模型</h3>
+    <div class="items">BGE-M3（1024维+稀疏）<br>bge-small-zh-v1.5（512维）<br>多语言 · 中英混合<br>内置默认 · 开箱即用</div>
+  </div>
+  <div class="tile t4">
+    <div class="icon">🔍</div>
+    <h3>检索能力</h3>
+    <div class="items">稠密语义 + 稀疏词法<br>RRF 融合 · Reranker 重排<br>HyDE 查询扩展增强<br>Top-K 可配置</div>
+  </div>
+  <div class="tile t5">
+    <div class="icon">📄</div>
+    <h3>文档处理</h3>
+    <div class="items">MD / TXT / PDF / DOCX / PPTX<br>结构化切片（H2 标题）<br>语义切片 · 迟到切片<br>增量扫描 · 批量导入</div>
+  </div>
+  <div class="tile t6">
+    <div class="icon">🌐</div>
+    <h3>LLM 后端</h3>
+    <div class="items">OpenAI 兼容 API 协议<br>DeepSeek · OpenAI · 自定义<br>流式输出 · 多轮对话<br>System Prompt 可定制</div>
+  </div>
+</div>
+
+<div class="oss-bar">
+  <div class="oss-item">
+    <div class="key">MIT</div>
+    <div class="val">开源协议</div>
+  </div>
+  <div class="oss-item">
+    <div class="key">零依赖</div>
+    <div class="val">Qdrant 嵌入式</div>
+  </div>
+  <div class="oss-item">
+    <div class="key">完全本地</div>
+    <div class="val">数据不出设备</div>
+  </div>
+  <div class="oss-item">
+    <div class="key">一键启动</div>
+    <div class="val">启动.bat</div>
+  </div>
+</div>
+
+<div class="footer">
+  🚀 github.com/jjq1059290444-crypto/LocalKB
+</div>
+
+</body>
+</html>

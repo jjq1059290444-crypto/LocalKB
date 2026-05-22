@@ -23,6 +23,8 @@ def chunk_structural(doc: dict) -> list[dict]:
     chunks = _add_overlap(raw_chunks)
 
     total = len(chunks)
+    from . import extract_heading
+
     results = []
     for i, text in enumerate(chunks):
         results.append({
@@ -31,6 +33,7 @@ def chunk_structural(doc: dict) -> list[dict]:
             "total_chunks": total,
             "char_count": len(text),
             "content": text,
+            "heading": extract_heading(text),
             "md5": _md5(text),
             "chunked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         })
