@@ -7,10 +7,11 @@ data/*.jsonl
 data/*.json
 
 # ── Config (may contain API keys) ──
-config.json
+/config.json
 
-# ── Models (downloaded at first launch) ──
-models/
+# ── Models (only the built-in default is tracked) ──
+models/*
+!models/BAAI_bge-small-zh-v1.5/
 
 # ── Build / Release ──
 release/

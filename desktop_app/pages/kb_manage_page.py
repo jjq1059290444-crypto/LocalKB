@@ -380,6 +380,57 @@ class KBManagePage(QWidget):
 
         source_collection = collections[0]
 
+        # ── Pre-check: source vector dimension vs current embed model ──
+        try:
+            from qdrant_client import QdrantClient
+            source_client = QdrantClient(path=source_dir)
+            source_info = source_client.get_collection(source_collection)
+            source_vectors = source_info.config.params.vectors
+            if isinstance(source_vectors, dict):
+                # Named vectors — pick the first non-sparse one
+                for vk, vp in source_vectors.items():
+                    if vk != "sparse" and hasattr(vp, "size"):
+                        source_dim = vp.size
+                        break
+                else:
+                    source_dim = None
+            elif hasattr(source_vectors, "size"):
+                source_dim = source_vectors.size
+            else:
+                source_dim = None
+            source_client.close()
+
+            if source_dim is not None:
+                config = self._config_mgr.load()
+                current_embed = config.get("embed_model", "bge-small-zh-v1.5")
+                current_info = EMBED_MODELS.get(current_embed, {})
+                current_dim = current_info.get("dim", 0)
+
+                if source_dim != current_dim:
+                    # Find which model matches the source dimension
+                    matching_models = [
+                        k for k, v in EMBED_MODELS.items()
+                        if v.get("dim") == source_dim
+                    ]
+                    model_hint = matching_models[0] if matching_models else "???"
+                    model_dim_hint = f"{model_hint}（{source_dim} 维）"
+                    current_dim_str = f"{current_embed}（{current_dim} 维）"
+
+                    QMessageBox.warning(
+                        self,
+                        self._i18n.t("kb.import_dim_mismatch_title"),
+                        self._i18n.t(
+                            "kb.import_dim_mismatch",
+                            source_dim=source_dim,
+                            model_hint=model_dim_hint,
+                            current=current_dim_str,
+                        ),
+                    )
+                    return
+        except Exception as e:
+            # Non-critical — proceed with import anyway
+            print(f"Dimension pre-check failed (non-fatal): {e}", flush=True)
+
         self._progress.setVisible(True)
         self._progress.setMaximum(0)
         self._stage_lbl.setVisible(True)

@@ -15,6 +15,9 @@
     "ready_with_model": "Ready  .  {model}  .  {api_base}",
     "init_error": "Init error: {error}",
     "not_configured": "Not configured — go to API Config page",
+    "init_error_title": "Initialization Failed",
+    "vector_db_locked_title": "Database Locked",
+    "vector_db_locked_msg": "Cannot access the vector database:\n{path}\n\nThe database files may be locked by another program (e.g. antivirus, backup tool), or a previous session exited abnormally leaving a stale lock file.\n\nTry:\n1. Restart your computer and try again\n2. Temporarily disable antivirus and try again\n3. Delete the directory above and restart the app",
     "first_run": "Welcome to LocalKB! Please set up your API Key in the API Config page."
   },
   "chat": {
@@ -48,6 +51,8 @@
     "import_complete_title": "Import Complete",
     "imported_count": "Imported {count} records.",
     "import_error": "Import failed: {detail}",
+    "import_dim_mismatch_title": "Dimension Mismatch",
+    "import_dim_mismatch": "The import data has {source_dim}-dimensional vectors, matching the embedding model {model_hint}.\n\nYour current embedding model is {current}, which is incompatible.\n\nPlease go to Settings and switch the embedding model to {model_hint}, download the model, then re-import. If you prefer to use {current}, import first, then switch models and \"Re-index All\".",
     "file_dialog_title": "Select Documents",
     "file_filter": "Documents (*.md *.txt *.pdf *.docx *.pptx *.ppt);;All Files (*.*)",
     "added_chunks": "Added {added} chunks",
@@ -80,7 +85,11 @@
     "restore_default": "Restore Default",
     "save": "Save Settings",
     "saved_title": "Saved",
-    "saved_msg": "Settings saved. Takes effect on next question."
+    "saved_msg": "Settings saved. Takes effect on next question.",
+    "restart_title": "Restart Required",
+    "restart_msg": "Embedding model changed from \"{old}\" to \"{new}\".\n\nThe vector database must be rebuilt with the new dimensions to work correctly.\nRestart the app now?",
+    "restart_now": "Restart Now",
+    "restart_later": "Restart Later"
   },
   "api": {
     "title": "API Configuration",

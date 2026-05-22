@@ -15,6 +15,9 @@
     "ready_with_model": "就绪  .  {model}  .  {api_base}",
     "init_error": "初始化错误: {error}",
     "not_configured": "未配置 — 请前往 API 配置页面",
+    "init_error_title": "初始化失败",
+    "vector_db_locked_title": "数据库被占用",
+    "vector_db_locked_msg": "向量数据库无法访问：\n{path}\n\n数据库文件可能被其他程序（如杀毒软件、备份工具）占用，或上次运行时异常退出导致文件锁残留。\n\n请尝试：\n1. 重启电脑后重试\n2. 暂时关闭杀毒软件后重试\n3. 删除上述目录后重启应用",
     "first_run": "欢迎使用 LocalKB！请先在 API 配置页面设置 API Key。"
   },
   "chat": {
@@ -48,6 +51,8 @@
     "import_complete_title": "导入完成",
     "imported_count": "已导入 {count} 条记录。",
     "import_error": "导入失败：{detail}",
+    "import_dim_mismatch_title": "维度不匹配",
+    "import_dim_mismatch": "导入数据的向量维度为 {source_dim}，对应嵌入模型 {model_hint}。\n\n当前配置的嵌入模型为 {current}，维度不一致，无法直接导入。\n\n请先到「设置」页面将嵌入模型切换为 {model_hint}，下载模型后重新导入。如需使用当前模型（{current}），请先导入，再切换模型并「重建索引」。",
     "file_dialog_title": "选择文档",
     "file_filter": "文档 (*.md *.txt *.pdf *.docx *.pptx *.ppt);;所有文件 (*.*)",
     "added_chunks": "已添加 {added} 个片段",
@@ -80,7 +85,11 @@
     "restore_default": "恢复默认",
     "save": "保存设置",
     "saved_title": "已保存",
-    "saved_msg": "设置已保存，下次提问生效。"
+    "saved_msg": "设置已保存，下次提问生效。",
+    "restart_title": "需要重启",
+    "restart_msg": "嵌入模型已从「{old}」切换为「{new}」。\n\n向量数据库需要以新维度重建才能正常使用。\n是否立即重启应用？",
+    "restart_now": "立即重启",
+    "restart_later": "稍后重启"
   },
   "api": {
     "title": "API 配置",

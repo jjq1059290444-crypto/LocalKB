@@ -1,14 +1,19 @@
 """settings_page.py — retrieval parameters + system prompt + embed model."""
 
+import subprocess
+import sys
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QTextEdit,
     QPushButton, QGroupBox, QSpinBox, QMessageBox, QSizePolicy, QComboBox,
-    QCheckBox,
+    QCheckBox, QApplication,
 )
 from PySide6.QtCore import Qt
 
 from config.manager import ConfigManager
 from config.presets import EMBED_MODELS
+from utils.model_download import download_model_if_needed
 
 CHUNK_STRATEGIES = {
     "structural": "H2 Structural",
@@ -41,7 +46,7 @@ class SettingsPage(QWidget):
         # top_k
         topk_row = QHBoxLayout()
         self._topk_lbl = QLabel()
-        self._topk_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._topk_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         topk_row.addWidget(self._topk_lbl)
 
         self._topk_spin = QSpinBox()
@@ -60,7 +65,7 @@ class SettingsPage(QWidget):
         # temperature
         temp_row = QHBoxLayout()
         self._temp_lbl = QLabel()
-        self._temp_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._temp_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         temp_row.addWidget(self._temp_lbl)
 
         self._temp_slider = QSlider(Qt.Horizontal)
@@ -84,7 +89,7 @@ class SettingsPage(QWidget):
         # Embed model selector
         embed_row = QHBoxLayout()
         self._embed_lbl = QLabel()
-        self._embed_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._embed_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         embed_row.addWidget(self._embed_lbl)
 
         self._embed_combo = QComboBox()
@@ -94,6 +99,7 @@ class SettingsPage(QWidget):
             QComboBox {
                 background: #FFFFFF; border: 1px solid #DFE6E9;
                 border-radius: 8px; padding: 6px 10px; font-size: 13px;
+                min-width: 220px;
             }
         """)
         self._embed_combo.currentIndexChanged.connect(self._on_embed_changed)
@@ -104,7 +110,7 @@ class SettingsPage(QWidget):
         # Matryoshka dimension selector
         matryoshka_row = QHBoxLayout()
         self._matryoshka_lbl = QLabel()
-        self._matryoshka_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._matryoshka_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         matryoshka_row.addWidget(self._matryoshka_lbl)
 
         self._matryoshka_combo = QComboBox()
@@ -113,6 +119,7 @@ class SettingsPage(QWidget):
             QComboBox {
                 background: #FFFFFF; border: 1px solid #DFE6E9;
                 border-radius: 8px; padding: 6px 10px; font-size: 13px;
+                min-width: 220px;
             }
         """)
         matryoshka_row.addWidget(self._matryoshka_combo, 1)
@@ -122,7 +129,7 @@ class SettingsPage(QWidget):
         # Chunking strategy selector
         chunk_row = QHBoxLayout()
         self._chunk_lbl = QLabel()
-        self._chunk_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._chunk_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         chunk_row.addWidget(self._chunk_lbl)
 
         self._chunk_combo = QComboBox()
@@ -132,6 +139,7 @@ class SettingsPage(QWidget):
             QComboBox {
                 background: #FFFFFF; border: 1px solid #DFE6E9;
                 border-radius: 8px; padding: 6px 10px; font-size: 13px;
+                min-width: 220px;
             }
         """)
         chunk_row.addWidget(self._chunk_combo, 1)
@@ -141,7 +149,7 @@ class SettingsPage(QWidget):
         # Reranker toggle
         rerank_row = QHBoxLayout()
         self._rerank_lbl = QLabel()
-        self._rerank_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._rerank_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         rerank_row.addWidget(self._rerank_lbl)
 
         self._rerank_check = QCheckBox()
@@ -153,7 +161,7 @@ class SettingsPage(QWidget):
         # HyDE toggle
         hyde_row = QHBoxLayout()
         self._hyde_lbl = QLabel()
-        self._hyde_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._hyde_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         hyde_row.addWidget(self._hyde_lbl)
 
         self._hyde_check = QCheckBox()
@@ -165,7 +173,7 @@ class SettingsPage(QWidget):
         # Max history turns
         hist_row = QHBoxLayout()
         self._hist_lbl = QLabel()
-        self._hist_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 150px;")
+        self._hist_lbl.setStyleSheet("font-size: 13px; color: #636E72; min-width: 180px;")
         hist_row.addWidget(self._hist_lbl)
 
         self._hist_spin = QSpinBox()
@@ -324,16 +332,56 @@ class SettingsPage(QWidget):
 
     def _on_save(self):
         config = self._config_mgr.load()
+        old_embed = config.get("embed_model", "")
+        new_embed = self._embed_combo.currentData()
+        embed_changed = (old_embed and old_embed != new_embed)
+
         config["top_k"] = self._topk_spin.value()
         config["temperature"] = self._temp_slider.value() / 10.0
         config["system_prompt"] = self._prompt_edit.toPlainText()
-        config["embed_model"] = self._embed_combo.currentData()
+        config["embed_model"] = new_embed
         config["use_reranker"] = self._rerank_check.isChecked()
         config["hyde_enabled"] = self._hyde_check.isChecked()
         config["max_history_turns"] = self._hist_spin.value()
         config["chunking_strategy"] = self._chunk_combo.currentData()
         config["matryoshka_dim"] = self._matryoshka_combo.currentData()
         self._config_mgr.save(config)
+
+        # ── Download embed model if needed ──
+        if new_embed != "text-embedding-3-small":
+            info = EMBED_MODELS.get(new_embed, {})
+            model_name = info.get("name", "")
+            if model_name:
+                ok = download_model_if_needed(model_name, self)
+                if not ok:
+                    return  # download failed or cancelled — config already saved
+
+        # ── Restart prompt if embed model changed ──
+        if embed_changed:
+            box = QMessageBox(self)
+            box.setWindowTitle(self._i18n.t("settings.restart_title"))
+            box.setText(self._i18n.t(
+                "settings.restart_msg",
+                old=old_embed,
+                new=new_embed,
+            ))
+            box.setIcon(QMessageBox.Question)
+            restart_btn = box.addButton(self._i18n.t("settings.restart_now"), QMessageBox.AcceptRole)
+            later_btn = box.addButton(self._i18n.t("settings.restart_later"), QMessageBox.RejectRole)
+            box.setDefaultButton(restart_btn)
+            box.exec()
+
+            if box.clickedButton() == restart_btn:
+                # Relaunch the app
+                main_script = Path(__file__).resolve().parent.parent / "main.py"
+                subprocess.Popen(
+                    [sys.executable, str(main_script)],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                    if sys.platform == "win32" else 0,
+                )
+                QApplication.instance().quit()
+            return
+
         QMessageBox.information(
             self,
             self._i18n.t("settings.saved_title"),
