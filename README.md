@@ -23,7 +23,7 @@
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/<your-username>/LocalKB.git
+git clone https://github.com/jjq1059290444-crypto/LocalKB.git
 cd LocalKB
 
 # 2. 双击启动（首次自动安装依赖）
