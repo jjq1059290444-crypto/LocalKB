@@ -1,0 +1,135 @@
+{
+  "app": {
+    "name": "LocalKB",
+    "version_label": "v1.0  .  LocalKB"
+  },
+  "nav": {
+    "chat": "对话",
+    "kb_manage": "知识库管理",
+    "settings": "设置",
+    "api_config": "API 配置",
+    "about": "关于"
+  },
+  "status": {
+    "ready": "就绪",
+    "ready_with_model": "就绪  .  {model}  .  {api_base}",
+    "init_error": "初始化错误: {error}",
+    "not_configured": "未配置 — 请前往 API 配置页面",
+    "first_run": "欢迎使用 LocalKB！请先在 API 配置页面设置 API Key。"
+  },
+  "chat": {
+    "thinking": "思考中…",
+    "engine_not_init": "QA 引擎未初始化，请先在 API 配置页面设置 API Key。",
+    "error_prefix": "错误：{error}"
+  },
+  "kb": {
+    "title": "知识库管理",
+    "desc": "上传文档（.md / .txt / .pdf / .docx / .pptx），系统将自动切片并加入知识库索引。",
+    "upload_group": "上传文档",
+    "upload_hint": "点击选择文档 或 拖拽到此处",
+    "upload_sub": "支持 .md / .txt / .pdf / .docx / .pptx / .ppt",
+    "indexed_group": "已索引文档",
+    "refresh_btn": "刷新列表",
+    "clear_btn": "清空索引",
+    "file_dialog_title": "选择文档",
+    "file_filter": "文档 (*.md *.txt *.pdf *.docx *.pptx *.ppt);;所有文件 (*.*)",
+    "added_chunks": "已添加 {added} 个片段",
+    "skipped_files": "，已跳过 {skipped} 个文件",
+    "errors_prefix": "\n错误：{errors}",
+    "complete_title": "完成",
+    "error_title": "错误",
+    "confirm_title": "确认",
+    "confirm_clear": "确定要清空整个知识库索引吗？此操作不可撤销。",
+    "done_title": "完成",
+    "cleared_msg": "索引已清空。",
+    "total_chunks": "已索引片段总数：{count}"
+  },
+  "settings": {
+    "title": "设置",
+    "retrieval_params": "检索参数",
+    "top_k": "检索条数 (Top-K)",
+    "temperature": "随机性 (Temperature)",
+    "embed_model": "嵌入模型",
+    "matryoshka_dim": "向量维度",
+    "matryoshka_na": "不支持（无截断）",
+    "chunk_strategy": "切片策略",
+    "reranker": "重排序",
+    "reranker_desc": "启用 Cross-encoder 重排序（需安装 FlagEmbedding）",
+    "system_prompt": "System Prompt",
+    "prompt_desc": "编辑 AI 的系统提示词。修改后立即生效，无需重启。",
+    "hyde": "HyDE",
+    "hyde_desc": "生成假设性答案以提升检索命中率",
+    "max_history": "对话历史轮数",
+    "restore_default": "恢复默认",
+    "save": "保存设置",
+    "saved_title": "已保存",
+    "saved_msg": "设置已保存，下次提问生效。"
+  },
+  "api": {
+    "title": "API 配置",
+    "desc": "支持 DeepSeek、OpenAI 及任意 OpenAI 兼容 API。",
+    "connection_group": "LLM API 连接",
+    "provider_label": "供应商",
+    "key_label": "API Key",
+    "key_placeholder": "sk-xxxxxxxxxxxxxxxx",
+    "url_label": "Base URL",
+    "url_placeholder": "https://api.deepseek.com",
+    "model_label": "模型名",
+    "model_placeholder": "deepseek-chat",
+    "test_btn": "测试连接",
+    "save_btn": "保存配置",
+    "missing_key_title": "缺少 API Key",
+    "missing_key_msg": "请输入 API Key。",
+    "saved_title": "已保存",
+    "saved_msg": "API 配置已保存。重启应用后生效。",
+    "no_key_first": "请先输入 API Key。",
+    "testing": "测试中…",
+    "connection_success": "连接成功",
+    "connection_failed": "连接失败"
+  },
+  "about": {
+    "title": "关于 LocalKB",
+    "app_name": "应用名称",
+    "app_name_val": "LocalKB",
+    "version": "版本",
+    "version_val": "1.0.0",
+    "license": "许可证",
+    "license_val": "MIT",
+    "author": "作者",
+    "author_val": "Open Source Community",
+    "tech_stack": "技术栈",
+    "tech_gui": "GUI 框架：PySide6",
+    "tech_vector": "向量数据库：Qdrant Embedded（Rust + RocksDB）",
+    "tech_llm": "大模型：OpenAI 兼容 API（DeepSeek、OpenAI、Custom）",
+    "tech_embed": "嵌入模型：BAAI/bge-m3（稠密 + 稀疏）",
+    "tech_bm25": "稀疏搜索：BGE-M3 词法权重（原生）",
+    "tech_rrf": "检索融合：Qdrant 内置 RRF",
+    "license_title": "MIT 许可证"
+  },
+  "source": {
+    "title": "参考来源",
+    "empty_hint": "提问后此处显示参考来源",
+    "no_sources": "暂无参考来源",
+    "unknown": "未知来源"
+  },
+  "history": {
+    "title": "历史记录",
+    "search_placeholder": "搜索历史问题…"
+  },
+  "input": {
+    "send": "发送",
+    "placeholder": "输入问题，按 Ctrl+Enter 发送…"
+  },
+  "index": {
+    "import_error": "核心模块导入失败：{detail}",
+    "parsing": "解析中：{name}",
+    "chunking": "切片中：{name}",
+    "embedding": "嵌入中：{count} 个片段 — {name}",
+    "storing": "存储中：{count} 个片段"
+  },
+  "config": {
+    "connected": "已连接到 {url}",
+    "unexpected": "连接返回异常结果",
+    "error": "{detail}"
+  }
+}

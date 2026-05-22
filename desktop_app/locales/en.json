@@ -1,0 +1,135 @@
+{
+  "app": {
+    "name": "LocalKB",
+    "version_label": "v1.0  .  LocalKB"
+  },
+  "nav": {
+    "chat": "Chat",
+    "kb_manage": "KB Manage",
+    "settings": "Settings",
+    "api_config": "API Config",
+    "about": "About"
+  },
+  "status": {
+    "ready": "Ready",
+    "ready_with_model": "Ready  .  {model}  .  {api_base}",
+    "init_error": "Init error: {error}",
+    "not_configured": "Not configured — go to API Config page",
+    "first_run": "Welcome to LocalKB! Please set up your API Key in the API Config page."
+  },
+  "chat": {
+    "thinking": "Thinking…",
+    "engine_not_init": "QA engine not initialized. Please configure API settings first.",
+    "error_prefix": "Error: {error}"
+  },
+  "kb": {
+    "title": "Knowledge Base Management",
+    "desc": "Upload documents (.md / .txt / .pdf / .docx / .pptx). System will auto-chunk and index them.",
+    "upload_group": "Upload Documents",
+    "upload_hint": "Click to select documents or drag them here",
+    "upload_sub": "Supports .md / .txt / .pdf / .docx / .pptx / .ppt",
+    "indexed_group": "Indexed Documents",
+    "refresh_btn": "Refresh List",
+    "clear_btn": "Clear Index",
+    "file_dialog_title": "Select Documents",
+    "file_filter": "Documents (*.md *.txt *.pdf *.docx *.pptx *.ppt);;All Files (*.*)",
+    "added_chunks": "Added {added} chunks",
+    "skipped_files": ", skipped {skipped} files",
+    "errors_prefix": "\nErrors: {errors}",
+    "complete_title": "Complete",
+    "error_title": "Error",
+    "confirm_title": "Confirm",
+    "confirm_clear": "Clear the entire knowledge base index? This cannot be undone.",
+    "done_title": "Done",
+    "cleared_msg": "Index cleared.",
+    "total_chunks": "Total chunks indexed: {count}"
+  },
+  "settings": {
+    "title": "Settings",
+    "retrieval_params": "Retrieval Parameters",
+    "top_k": "Top-K Results",
+    "temperature": "Temperature",
+    "embed_model": "Embedding Model",
+    "matryoshka_dim": "Vector Dimension",
+    "matryoshka_na": "N/A (no truncation)",
+    "chunk_strategy": "Chunk Strategy",
+    "reranker": "Reranker",
+    "reranker_desc": "Enable Cross-encoder reranking (requires FlagEmbedding)",
+    "system_prompt": "System Prompt",
+    "prompt_desc": "Edit the system prompt. Changes take effect immediately.",
+    "hyde": "HyDE",
+    "hyde_desc": "Generate hypothetical answer for better retrieval",
+    "max_history": "History Turns",
+    "restore_default": "Restore Default",
+    "save": "Save Settings",
+    "saved_title": "Saved",
+    "saved_msg": "Settings saved. Takes effect on next question."
+  },
+  "api": {
+    "title": "API Configuration",
+    "desc": "Supports DeepSeek, OpenAI, and any OpenAI-compatible API.",
+    "connection_group": "LLM API Connection",
+    "provider_label": "Provider",
+    "key_label": "API Key",
+    "key_placeholder": "sk-xxxxxxxxxxxxxxxx",
+    "url_label": "Base URL",
+    "url_placeholder": "https://api.deepseek.com",
+    "model_label": "Model",
+    "model_placeholder": "deepseek-chat",
+    "test_btn": "Test Connection",
+    "save_btn": "Save Config",
+    "missing_key_title": "Missing API Key",
+    "missing_key_msg": "Please enter your API Key.",
+    "saved_title": "Saved",
+    "saved_msg": "API configuration saved. Restart the app for changes to take effect.",
+    "no_key_first": "Please enter an API Key first.",
+    "testing": "Testing…",
+    "connection_success": "Connection Success",
+    "connection_failed": "Connection Failed"
+  },
+  "about": {
+    "title": "About LocalKB",
+    "app_name": "App Name",
+    "app_name_val": "LocalKB",
+    "version": "Version",
+    "version_val": "1.0.0",
+    "license": "License",
+    "license_val": "MIT",
+    "author": "Author",
+    "author_val": "Open Source Community",
+    "tech_stack": "Tech Stack",
+    "tech_gui": "GUI Framework: PySide6",
+    "tech_vector": "Vector Database: Qdrant Embedded (Rust + RocksDB)",
+    "tech_llm": "LLM Backend: OpenAI-compatible API (DeepSeek, OpenAI, Custom)",
+    "tech_embed": "Embedding Model: BAAI/bge-m3 (dense + sparse)",
+    "tech_bm25": "Sparse Search: BGE-M3 lexical weights (native)",
+    "tech_rrf": "Retrieval Fusion: Qdrant built-in RRF",
+    "license_title": "MIT License"
+  },
+  "source": {
+    "title": "Reference Sources",
+    "empty_hint": "Sources will appear here after asking a question",
+    "no_sources": "No reference sources",
+    "unknown": "unknown"
+  },
+  "history": {
+    "title": "History",
+    "search_placeholder": "Search history…"
+  },
+  "input": {
+    "send": "Send",
+    "placeholder": "Enter your question, Ctrl+Enter to send…"
+  },
+  "index": {
+    "import_error": "Failed to import core modules: {detail}",
+    "parsing": "Parsing: {name}",
+    "chunking": "Chunking: {name}",
+    "embedding": "Embedding: {count} chunks from {name}",
+    "storing": "Storing: {count} chunks"
+  },
+  "config": {
+    "connected": "Connected to {url}",
+    "unexpected": "Connection returned unexpected result",
+    "error": "{detail}"
+  }
+}

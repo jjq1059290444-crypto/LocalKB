@@ -1,0 +1,13 @@
+PySide6>=6.5
+openai>=1.0
+httpx
+qdrant-client>=1.9
+sentence-transformers
+rich
+python-dotenv
+markdown
+modelscope
+pymupdf>=1.23
+python-docx>=0.8
+python-pptx>=0.6
+# FlagEmbedding  (optional, for cross-encoder reranking)

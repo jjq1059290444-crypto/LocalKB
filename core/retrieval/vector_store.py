@@ -1,0 +1,254 @@
+"""vector_store.py — Qdrant Embedded wrapper for dense + sparse vector storage.
+
+Replaces ChromaStore + BM25Searcher with a single engine that natively
+supports both dense vectors and sparse lexical vectors with built-in RRF fusion.
+
+API is intentionally identical to ChromaStore for drop-in compatibility.
+"""
+
+import uuid
+from pathlib import Path
+from typing import Optional
+
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qmodels
+
+NAMESPACE_KB = uuid.uuid5(uuid.NAMESPACE_DNS, "localkb")
+
+def _make_point_id(raw_id: str) -> str:
+    """Convert a non-UUID string ID to a deterministic UUID5."""
+    return str(uuid.uuid5(NAMESPACE_KB, raw_id))
+
+
+class VectorStore:
+    """Local vector storage backed by Qdrant Embedded (Rust + RocksDB).
+
+    One collection = one knowledge base. Thread-safe.
+
+    Supports both dense vectors (cosine) and sparse vectors (dot-product
+    lexical weights from BGE-M3) in a single collection.
+    """
+
+    def __init__(self, db_path: Path, collection_name: str = "local_kb",
+                 vector_size: int = 1024,
+                 use_sparse: bool = False):
+        self._path = str(db_path)
+        self._collection_name = collection_name
+        self._vector_size = vector_size
+        self._use_sparse = use_sparse
+        self._client: Optional[QdrantClient] = None
+        self._ensure_collection()
+
+    # ── public API (ChromaStore-compatible) ──────────────────────
+
+    def add(self, ids: list[str], embeddings,
+            metadatas: list[dict], documents: list[str],
+            sparse_vectors: Optional[list[dict[int, float]]] = None) -> None:
+        """Insert chunks into the collection.
+
+        Args:
+            ids: unique chunk IDs.
+            embeddings: dense vectors, shape [N, dim] as np.ndarray or list.
+            metadatas: per-chunk metadata dicts.
+            documents: per-chunk full text.
+            sparse_vectors: optional sparse lexical weights (BGE-M3).
+        """
+        points = []
+        for i, cid in enumerate(ids):
+            dense = embeddings[i]
+            if hasattr(dense, "tolist"):
+                dense = dense.tolist()
+
+            point_kwargs = {
+                "id": _make_point_id(cid),
+                "vector": dense,
+                "payload": {
+                    "source_file": metadatas[i].get("source_file", ""),
+                    "chunk_index": metadatas[i].get("chunk_index", 0),
+                    "content": documents[i] if i < len(documents) else "",
+                },
+            }
+
+            # Attach sparse vector if available
+            if sparse_vectors and i < len(sparse_vectors) and sparse_vectors[i]:
+                sv = sparse_vectors[i]
+                point_kwargs["vector"] = {
+                    "": dense,  # default dense
+                    "sparse": qmodels.SparseVector(
+                        indices=list(sv.keys()),
+                        values=list(sv.values()),
+                    ),
+                }
+
+            points.append(qmodels.PointStruct(**point_kwargs))
+
+        self.client.upsert(
+            collection_name=self._collection_name,
+            points=points,
+            wait=True,
+        )
+
+    def query(self, query_embedding, top_k: int = 10,
+              query_sparse: Optional[dict[int, float]] = None) -> list[dict]:
+        """Search the collection.
+
+        When query_sparse is provided, uses Qdrant's native RRF fusion.
+        Otherwise, dense-only cosine search.
+        """
+        if query_sparse and self._use_sparse:
+            return self._hybrid_query(query_embedding, query_sparse, top_k)
+        return self._dense_query(query_embedding, top_k)
+
+    def count(self) -> int:
+        try:
+            info = self.client.get_collection(self._collection_name)
+            return info.points_count or 0
+        except Exception:
+            return 0
+
+    def delete_by_ids(self, ids: list[str]) -> None:
+        self.client.delete(
+            collection_name=self._collection_name,
+            points_selector=qmodels.PointIdsList(
+                points=[_make_point_id(i) for i in ids]
+            ),
+            wait=True,
+        )
+
+    def get_all_documents(self) -> list[tuple[str, str, str]]:
+        """Return all stored documents as [(id, source_file, content), ...]."""
+        try:
+            all_points = []
+            offset = None
+            while True:
+                batch, offset = self.client.scroll(
+                    collection_name=self._collection_name,
+                    limit=1000,
+                    offset=offset,
+                    with_payload=True,
+                )
+                if batch:
+                    all_points.extend(batch)
+                if offset is None:
+                    break
+            return [
+                (p.id, p.payload.get("source_file", ""), p.payload.get("content", ""))
+                for p in all_points
+            ]
+        except Exception:
+            return []
+
+    def get_source_files(self) -> dict[str, int]:
+        """Return {source_file: chunk_count} for all indexed documents."""
+        try:
+            all_points = []
+            offset = None
+            while True:
+                batch, offset = self.client.scroll(
+                    collection_name=self._collection_name,
+                    limit=1000,
+                    offset=offset,
+                    with_payload=["source_file"],
+                )
+                if batch:
+                    all_points.extend(batch)
+                if offset is None:
+                    break
+            counts: dict[str, int] = {}
+            for p in all_points:
+                src = p.payload.get("source_file", "unknown")
+                counts[src] = counts.get(src, 0) + 1
+            return counts
+        except Exception:
+            return {}
+
+    def reset(self) -> None:
+        """Delete the entire collection."""
+        try:
+            self.client.delete_collection(self._collection_name)
+        except Exception:
+            pass
+        self._ensure_collection()
+
+    # ── internal ─────────────────────────────────────────────────
+
+    @property
+    def client(self) -> QdrantClient:
+        if self._client is None:
+            Path(self._path).mkdir(parents=True, exist_ok=True)
+            self._client = QdrantClient(path=self._path)
+        return self._client
+
+    def _ensure_collection(self):
+        try:
+            self.client.get_collection(self._collection_name)
+        except Exception:
+            sparse_config = None
+            if self._use_sparse:
+                sparse_config = {
+                    "sparse": qmodels.SparseVectorParams(),
+                }
+            self.client.create_collection(
+                collection_name=self._collection_name,
+                vectors_config=qmodels.VectorParams(
+                    size=self._vector_size,
+                    distance=qmodels.Distance.COSINE,
+                ),
+                sparse_vectors_config=sparse_config,
+            )
+
+    def _dense_query(self, query_embedding, top_k: int) -> list[dict]:
+        qvec = query_embedding
+        if hasattr(qvec, "tolist"):
+            qvec = qvec.tolist()
+
+        results = self.client.query_points(
+            collection_name=self._collection_name,
+            query=qvec,
+            limit=top_k,
+            with_payload=True,
+        )
+        return _flatten_results(results)
+
+    def _hybrid_query(self, query_embedding, query_sparse: dict[int, float],
+                      top_k: int) -> list[dict]:
+        qvec = query_embedding
+        if hasattr(qvec, "tolist"):
+            qvec = qvec.tolist()
+
+        results = self.client.query_points(
+            collection_name=self._collection_name,
+            prefetch=[
+                qmodels.Prefetch(
+                    query=qvec,
+                    using="",
+                    limit=max(top_k * 2, 20),
+                ),
+                qmodels.Prefetch(
+                    query=qmodels.SparseVector(
+                        indices=list(query_sparse.keys()),
+                        values=list(query_sparse.values()),
+                    ),
+                    using="sparse",
+                    limit=max(top_k, 15),
+                ),
+            ],
+            query=qmodels.FusionQuery(fusion=qmodels.Fusion.RRF),
+            limit=top_k,
+            with_payload=True,
+        )
+        return _flatten_results(results)
+
+
+def _flatten_results(results) -> list[dict]:
+    out = []
+    for pt in results.points:
+        payload = pt.payload or {}
+        out.append({
+            "id": pt.id,
+            "source_file": payload.get("source_file", ""),
+            "chunk_index": payload.get("chunk_index", 0),
+            "content": payload.get("content", ""),
+            "score": pt.score or 0.0,
+        })
+    return out

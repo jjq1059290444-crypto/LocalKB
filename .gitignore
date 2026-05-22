@@ -1,0 +1,34 @@
+# ── Runtime data ──
+data/chroma_db/
+data/vector_db/
+data/*.pkl
+data/*.npy
+data/*.jsonl
+data/*.json
+
+# ── Config (may contain API keys) ──
+config.json
+
+# ── Models (downloaded at first launch) ──
+models/
+
+# ── Build / Release ──
+release/
+
+# ── Python ──
+__pycache__/
+*.pyc
+venv/
+*.egg-info/
+
+# ── IDE ──
+.vscode/
+.idea/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Claude ──
+.claude/
+CONTINUE.md
