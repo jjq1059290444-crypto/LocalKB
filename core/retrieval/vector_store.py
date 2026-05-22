@@ -170,6 +170,69 @@ class VectorStore:
             pass
         self._ensure_collection()
 
+    def import_from(self, source_db_path: str, source_collection: str) -> int:
+        """Import all points from another Qdrant database directly.
+
+        Args:
+            source_db_path: Path to the source Qdrant data directory.
+            source_collection: Collection name in the source database.
+
+        Returns:
+            Number of points imported.
+        """
+        source = QdrantClient(path=source_db_path)
+
+        # Scroll all points from source
+        imported = 0
+        offset = None
+        while True:
+            batch, offset = source.scroll(
+                collection_name=source_collection,
+                limit=500,
+                offset=offset,
+                with_payload=True,
+                with_vectors=True,
+            )
+            if not batch:
+                break
+
+            points = []
+            for pt in batch:
+                payload = pt.payload or {}
+                # Map source vector to target format:
+                # Source may use named vectors like {"dense": [...]},
+                # target uses anonymous "" key. Extract the raw dense vector.
+                raw_vec = pt.vector
+                if isinstance(raw_vec, dict):
+                    # Named vectors: pick the first dense vector
+                    for vk, vv in raw_vec.items():
+                        if vk != "sparse":
+                            raw_vec = vv
+                            break
+                # Build point with same id, vector, and core payload fields
+                points.append(qmodels.PointStruct(
+                    id=pt.id,
+                    vector=raw_vec,
+                    payload={
+                        "source_file": payload.get("source_file", ""),
+                        "chunk_index": payload.get("chunk_index", 0),
+                        "content": payload.get("content", ""),
+                    },
+                ))
+
+            self.client.upsert(
+                collection_name=self._collection_name,
+                points=points,
+                wait=True,
+            )
+            imported += len(points)
+
+            if offset is None:
+                break
+
+        source.close()
+        return imported
+
     # ── internal ─────────────────────────────────────────────────
 
     @property

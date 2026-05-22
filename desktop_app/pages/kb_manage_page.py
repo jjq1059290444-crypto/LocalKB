@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt
 from core.paths import VECTOR_DB_DIR, DOCS_DIR
 from core.retrieval.vector_store import VectorStore
 from workers.index_worker import IndexWorker
+from workers.qdrant_import_worker import QdrantImportWorker
 from config.manager import ConfigManager
 from config.presets import EMBED_MODELS, get_embed_model_path
 
@@ -27,6 +28,7 @@ class KBManagePage(QWidget):
         self._config_mgr = config_manager
         self._i18n = i18n
         self._worker = None
+        self._import_worker = None
 
         DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -148,6 +150,18 @@ class KBManagePage(QWidget):
         self._refresh_btn.clicked.connect(self._refresh)
         btn_row.addWidget(self._refresh_btn)
 
+        self._scan_btn = QPushButton()
+        self._scan_btn.setStyleSheet("""
+            QPushButton {
+                background: #E8F4FD; color: #1565C0;
+                border: 1px solid #BBDEFB; border-radius: 8px;
+                padding: 8px 18px; font-weight: 600;
+            }
+            QPushButton:hover { background: #BBDEFB; }
+        """)
+        self._scan_btn.clicked.connect(self._on_scan)
+        btn_row.addWidget(self._scan_btn)
+
         self._reindex_btn = QPushButton()
         self._reindex_btn.setStyleSheet("""
             QPushButton {
@@ -159,6 +173,18 @@ class KBManagePage(QWidget):
         """)
         self._reindex_btn.clicked.connect(self._on_reindex)
         btn_row.addWidget(self._reindex_btn)
+
+        self._import_btn = QPushButton()
+        self._import_btn.setStyleSheet("""
+            QPushButton {
+                background: #F5F0FF; color: #6A1B9A;
+                border: 1px solid #D1C4E9; border-radius: 8px;
+                padding: 8px 18px; font-weight: 600;
+            }
+            QPushButton:hover { background: #D1C4E9; }
+        """)
+        self._import_btn.clicked.connect(self._on_import_qdrant)
+        btn_row.addWidget(self._import_btn)
 
         self._reset_btn = QPushButton()
         self._reset_btn.setStyleSheet("""
@@ -191,7 +217,9 @@ class KBManagePage(QWidget):
         self._indexed_group.setTitle(self._i18n.t("kb.indexed_group"))
         self._refresh_btn.setText(self._i18n.t("kb.refresh_btn"))
         self._reindex_btn.setText(self._i18n.t("kb.reindex_btn"))
+        self._scan_btn.setText(self._i18n.t("kb.scan_btn"))
         self._reset_btn.setText(self._i18n.t("kb.clear_btn"))
+        self._import_btn.setText(self._i18n.t("kb.import_btn"))
         self._refresh()
 
     def _on_pick_files(self, event=None):
@@ -269,8 +297,104 @@ class KBManagePage(QWidget):
         msg = self._i18n.t(key, **args)
         QMessageBox.critical(self, self._i18n.t("kb.error_title"), msg)
 
+    def _on_import_done(self, result: dict):
+        self._progress.setMaximum(1)
+        self._progress.setVisible(False)
+        self._stage_lbl.setVisible(False)
+
+        imported = result.get("imported", 0)
+        QMessageBox.information(
+            self,
+            self._i18n.t("kb.import_complete_title"),
+            self._i18n.t("kb.imported_count", count=imported),
+        )
+        self._refresh()
+
+    def _on_scan(self):
+        """Incremental scan: index only new files from data/docs/."""
+        if self._worker and self._worker.isRunning():
+            return
+
+        saved = {f.name: f for f in DOCS_DIR.iterdir() if f.is_file()}
+        if not saved:
+            QMessageBox.information(
+                self,
+                self._i18n.t("kb.no_saved_title"),
+                self._i18n.t("kb.no_saved_msg"),
+            )
+            return
+
+        # Find files not yet indexed
+        try:
+            indexed = set(self._store.get_source_files().keys())
+        except Exception:
+            indexed = set()
+
+        new_files = [str(saved[name]) for name in sorted(saved) if name not in indexed]
+        if not new_files:
+            QMessageBox.information(
+                self,
+                self._i18n.t("kb.scan_title"),
+                self._i18n.t("kb.scan_up_to_date"),
+            )
+            return
+
+        self._process_files(new_files)
+
+    def _on_import_qdrant(self):
+        """Import all points from a pre-built Qdrant database."""
+        if self._import_worker and self._import_worker.isRunning():
+            return
+
+        source_dir = QFileDialog.getExistingDirectory(
+            self,
+            self._i18n.t("kb.import_dialog_title"),
+            "",
+        )
+        if not source_dir:
+            return
+
+        # Read meta.json to find collection name
+        import json
+        meta_path = Path(source_dir) / "meta.json"
+        if not meta_path.exists():
+            QMessageBox.critical(
+                self,
+                self._i18n.t("kb.error_title"),
+                self._i18n.t("kb.import_no_meta"),
+            )
+            return
+
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            collections = list(meta.get("collections", {}).keys())
+            if not collections:
+                raise ValueError("No collections found")
+        except Exception:
+            QMessageBox.critical(
+                self,
+                self._i18n.t("kb.error_title"),
+                self._i18n.t("kb.import_invalid_meta"),
+            )
+            return
+
+        source_collection = collections[0]
+
+        self._progress.setVisible(True)
+        self._progress.setMaximum(0)
+        self._stage_lbl.setVisible(True)
+        self._stage_lbl.setText(self._i18n.t("kb.import_reading", path=source_dir))
+
+        self._import_worker = QdrantImportWorker(
+            self._store, source_dir, source_collection
+        )
+        self._import_worker.progress_signal.connect(self._on_progress)
+        self._import_worker.finished_signal.connect(self._on_import_done)
+        self._import_worker.error_signal.connect(self._on_error)
+        self._import_worker.start()
+
     def _on_reindex(self):
-        """Re-index all saved files from data/docs/ without clearing first."""
+        """Full re-index: reset then rebuild all saved files (for model switch)."""
         if self._worker and self._worker.isRunning():
             return
 
