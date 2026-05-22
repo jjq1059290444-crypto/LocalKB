@@ -17,6 +17,7 @@ DATA_DIR = BASE_DIR / "data"
 CHROMA_DIR = DATA_DIR / "chroma_db"           # legacy — kept for migration
 VECTOR_DB_DIR = DATA_DIR / "vector_db"        # Qdrant Embedded
 RAW_DIR = BASE_DIR / "raw_docs"
+DOCS_DIR = DATA_DIR / "docs"              # uploaded originals preserved across resets
 
 MODELS_DIR = BASE_DIR / "models"
 
@@ -44,5 +45,5 @@ CONFIG_DIR = Path(os.environ.get(
 ))
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
-for _d in [DATA_DIR, MODELS_DIR, CONFIG_DIR, CHROMA_DIR, VECTOR_DB_DIR, RAW_DIR]:
+for _d in [DATA_DIR, MODELS_DIR, CONFIG_DIR, CHROMA_DIR, VECTOR_DB_DIR, RAW_DIR, DOCS_DIR]:
     _d.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,6 @@
 """kb_manage_page.py — knowledge base management: upload .md/.txt files."""
 
+import shutil
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -9,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from core.paths import VECTOR_DB_DIR
+from core.paths import VECTOR_DB_DIR, DOCS_DIR
 from core.retrieval.vector_store import VectorStore
 from workers.index_worker import IndexWorker
 from config.manager import ConfigManager
@@ -26,6 +27,8 @@ class KBManagePage(QWidget):
         self._config_mgr = config_manager
         self._i18n = i18n
         self._worker = None
+
+        DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(32, 24, 32, 24)
@@ -110,6 +113,21 @@ class KBManagePage(QWidget):
 
         layout.addWidget(self._upload_group)
 
+        # ── Saved files list ──
+        self._saved_group = QGroupBox()
+        saved_layout = QVBoxLayout(self._saved_group)
+        saved_layout.setSpacing(10)
+
+        self._saved_stats = QLabel()
+        self._saved_stats.setStyleSheet("font-size: 12px; color: #636E72;")
+        saved_layout.addWidget(self._saved_stats)
+
+        self._saved_list = QListWidget()
+        self._saved_list.setMaximumHeight(120)
+        saved_layout.addWidget(self._saved_list)
+
+        layout.addWidget(self._saved_group)
+
         # ── Indexed files list ──
         self._indexed_group = QGroupBox()
         files_layout = QVBoxLayout(self._indexed_group)
@@ -120,7 +138,7 @@ class KBManagePage(QWidget):
         files_layout.addWidget(self._stats_lbl)
 
         self._file_list = QListWidget()
-        self._file_list.setMaximumHeight(200)
+        self._file_list.setMaximumHeight(120)
         files_layout.addWidget(self._file_list)
 
         btn_row = QHBoxLayout()
@@ -129,6 +147,18 @@ class KBManagePage(QWidget):
         self._refresh_btn = QPushButton()
         self._refresh_btn.clicked.connect(self._refresh)
         btn_row.addWidget(self._refresh_btn)
+
+        self._reindex_btn = QPushButton()
+        self._reindex_btn.setStyleSheet("""
+            QPushButton {
+                background: #E8F4FD; color: #1565C0;
+                border: 1px solid #BBDEFB; border-radius: 8px;
+                padding: 8px 18px; font-weight: 600;
+            }
+            QPushButton:hover { background: #BBDEFB; }
+        """)
+        self._reindex_btn.clicked.connect(self._on_reindex)
+        btn_row.addWidget(self._reindex_btn)
 
         self._reset_btn = QPushButton()
         self._reset_btn.setStyleSheet("""
@@ -157,8 +187,10 @@ class KBManagePage(QWidget):
         self._upload_group.setTitle(self._i18n.t("kb.upload_group"))
         self._pick_lbl.setText(self._i18n.t("kb.upload_hint"))
         self._sub_lbl.setText(self._i18n.t("kb.upload_sub"))
+        self._saved_group.setTitle(self._i18n.t("kb.saved_group"))
         self._indexed_group.setTitle(self._i18n.t("kb.indexed_group"))
         self._refresh_btn.setText(self._i18n.t("kb.refresh_btn"))
+        self._reindex_btn.setText(self._i18n.t("kb.reindex_btn"))
         self._reset_btn.setText(self._i18n.t("kb.clear_btn"))
         self._refresh()
 
@@ -176,6 +208,15 @@ class KBManagePage(QWidget):
         if self._worker and self._worker.isRunning():
             return
 
+        # Copy uploaded files to docs/ so they survive index resets
+        saved = []
+        for p in paths:
+            src = Path(p)
+            dst = DOCS_DIR / src.name
+            # If a file with same name exists, overwrite (user re-uploaded updated version)
+            shutil.copy2(src, dst)
+            saved.append(str(dst))
+
         self._progress.setVisible(True)
         self._progress.setMaximum(0)
         self._stage_lbl.setVisible(True)
@@ -187,7 +228,7 @@ class KBManagePage(QWidget):
         use_sparse = embed_info.get("sparse", False)
 
         self._worker = IndexWorker(
-            paths, self._store,
+            saved, self._store,
             embed_model_name=model_name,
             chunking_strategy=config.get("chunking_strategy", "structural"),
             matryoshka_dim=config.get("matryoshka_dim", 0),
@@ -228,6 +269,24 @@ class KBManagePage(QWidget):
         msg = self._i18n.t(key, **args)
         QMessageBox.critical(self, self._i18n.t("kb.error_title"), msg)
 
+    def _on_reindex(self):
+        """Re-index all saved files from data/docs/ without clearing first."""
+        if self._worker and self._worker.isRunning():
+            return
+
+        saved = list(DOCS_DIR.glob("*"))
+        if not saved:
+            QMessageBox.information(
+                self,
+                self._i18n.t("kb.no_saved_title"),
+                self._i18n.t("kb.no_saved_msg"),
+            )
+            return
+
+        # Reset first, then re-index
+        self._store.reset()
+        self._process_files([str(f) for f in saved])
+
     def _on_reset(self):
         reply = QMessageBox.question(
             self,
@@ -246,6 +305,26 @@ class KBManagePage(QWidget):
 
     def _refresh(self):
         self._file_list.clear()
+        self._saved_list.clear()
+
+        # Show saved files (data/docs/)
+        try:
+            saved_files = sorted(
+                f for f in DOCS_DIR.iterdir() if f.is_file()
+            )
+        except Exception:
+            saved_files = []
+
+        self._saved_stats.setText(
+            self._i18n.t("kb.saved_count", count=len(saved_files))
+        )
+        for f in saved_files:
+            size_kb = f.stat().st_size / 1024
+            self._saved_list.addItem(
+                f"{f.name}  —  {size_kb:.1f} KB"
+            )
+
+        # Show indexed chunks (from vector store)
         try:
             count = self._store.count()
             sources = self._store.get_source_files()
