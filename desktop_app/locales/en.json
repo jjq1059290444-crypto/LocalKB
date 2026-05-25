@@ -18,7 +18,11 @@
     "init_error_title": "Initialization Failed",
     "vector_db_locked_title": "Database Locked",
     "vector_db_locked_msg": "Cannot access the vector database:\n{path}\n\nThe database files may be locked by another program (e.g. antivirus, backup tool), or a previous session exited abnormally leaving a stale lock file.\n\nTry:\n1. Restart your computer and try again\n2. Temporarily disable antivirus and try again\n3. Delete the directory above and restart the app",
-    "first_run": "Welcome to LocalKB! Please set up your API Key in the API Config page."
+    "first_run": "Welcome to LocalKB! Please set up your API Key in the API Config page.",
+    "model_loading": "Loading embedding model…",
+    "opening_db": "Opening knowledge base…",
+    "starting": "Initializing knowledge base…",
+    "init_failed": "Init failed: {error}"
   },
   "chat": {
     "thinking": "Thinking…",
@@ -155,6 +159,7 @@
   "input": {
     "send": "Send",
     "placeholder": "Enter your question, Ctrl+Enter to send…",
+    "loading_placeholder": "Loading model…",
     "single_turn": "Single",
     "multi_turn": "Multi"
   },

@@ -205,7 +205,13 @@ class KBManagePage(QWidget):
         layout.addStretch()
 
         self.retranslate()
-        self._refresh()
+        # _refresh() is called on first showEvent to avoid blocking page creation
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Refresh on first show (page contents may have changed while hidden)
+        if hasattr(self, '_store') and self._store is not None:
+            self._refresh()
 
     def retranslate(self):
         self._title_lbl.setText(self._i18n.t("kb.title"))
@@ -220,7 +226,8 @@ class KBManagePage(QWidget):
         self._scan_btn.setText(self._i18n.t("kb.scan_btn"))
         self._reset_btn.setText(self._i18n.t("kb.clear_btn"))
         self._import_btn.setText(self._i18n.t("kb.import_btn"))
-        self._refresh()
+        # Data refresh happens in showEvent / manual refresh button
+        self._refresh()  # re-render stats with new language
 
     def _on_pick_files(self, event=None):
         paths, _ = QFileDialog.getOpenFileNames(

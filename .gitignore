@@ -1,6 +1,7 @@
 # ── Runtime data ──
 data/chroma_db/
 data/vector_db/
+data/chunks/
 data/*.pkl
 data/*.npy
 data/*.jsonl

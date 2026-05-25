@@ -5,14 +5,13 @@ Covers DeepSeek, OpenAI, and any OpenAI-compatible API (Ollama, etc.).
 
 from typing import Iterator
 
-from openai import OpenAI
-
 from .base import BaseLLMClient
 
 
 class OpenAICompatibleClient(BaseLLMClient):
     def __init__(self, api_base: str, api_key: str, model: str,
                  temperature: float = 0.3):
+        from openai import OpenAI  # lazy — ~0.9s import
         self._client = OpenAI(base_url=api_base, api_key=api_key)
         self._model = model
         self._temperature = temperature

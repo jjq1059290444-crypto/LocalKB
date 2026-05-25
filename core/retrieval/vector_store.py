@@ -10,8 +10,19 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from qdrant_client import QdrantClient
-from qdrant_client.http import models as qmodels
+# Lazy-loaded to avoid ~7s import penalty at app startup
+_QdrantClient = None
+_qmodels = None
+
+
+def _lazy_import():
+    global _QdrantClient, _qmodels
+    if _QdrantClient is None:
+        from qdrant_client import QdrantClient as QC
+        _QdrantClient = QC
+    if _qmodels is None:
+        from qdrant_client.http import models as qm
+        _qmodels = qm
 
 NAMESPACE_KB = uuid.uuid5(uuid.NAMESPACE_DNS, "localkb")
 
@@ -36,7 +47,8 @@ class VectorStore:
         self._collection_name = collection_name
         self._vector_size = vector_size
         self._use_sparse = use_sparse
-        self._client: Optional[QdrantClient] = None
+        self._client: Optional[object] = None  # QdrantClient, lazy-loaded
+        _lazy_import()
         self._ensure_collection()
 
     # ── public API (ChromaStore-compatible) ──────────────────────
@@ -75,13 +87,13 @@ class VectorStore:
                 sv = sparse_vectors[i]
                 point_kwargs["vector"] = {
                     "": dense,  # default dense
-                    "sparse": qmodels.SparseVector(
+                    "sparse": _qmodels.SparseVector(
                         indices=list(sv.keys()),
                         values=list(sv.values()),
                     ),
                 }
 
-            points.append(qmodels.PointStruct(**point_kwargs))
+            points.append(_qmodels.PointStruct(**point_kwargs))
 
         self.client.upsert(
             collection_name=self._collection_name,
@@ -110,7 +122,7 @@ class VectorStore:
     def delete_by_ids(self, ids: list[str]) -> None:
         self.client.delete(
             collection_name=self._collection_name,
-            points_selector=qmodels.PointIdsList(
+            points_selector=_qmodels.PointIdsList(
                 points=[_make_point_id(i) for i in ids]
             ),
             wait=True,
@@ -124,7 +136,7 @@ class VectorStore:
             while True:
                 batch, offset = self.client.scroll(
                     collection_name=self._collection_name,
-                    limit=1000,
+                    limit=50000,
                     offset=offset,
                     with_payload=True,
                 )
@@ -147,7 +159,7 @@ class VectorStore:
             while True:
                 batch, offset = self.client.scroll(
                     collection_name=self._collection_name,
-                    limit=1000,
+                    limit=50000,  # read all in one batch for typical collections
                     offset=offset,
                     with_payload=["source_file"],
                 )
@@ -181,7 +193,8 @@ class VectorStore:
         Returns:
             Number of points imported.
         """
-        source = QdrantClient(path=source_db_path)
+        _lazy_import()
+        source = _QdrantClient(path=source_db_path)
 
         # Scroll all points from source
         imported = 0
@@ -211,7 +224,7 @@ class VectorStore:
                             raw_vec = vv
                             break
                 # Build point with same id, vector, and core payload fields
-                points.append(qmodels.PointStruct(
+                points.append(_qmodels.PointStruct(
                     id=pt.id,
                     vector=raw_vec,
                     payload={
@@ -237,26 +250,40 @@ class VectorStore:
     # ── internal ─────────────────────────────────────────────────
 
     @property
-    def client(self) -> QdrantClient:
+    def client(self) -> object:  # QdrantClient, lazy-loaded
         if self._client is None:
+            _lazy_import()
             Path(self._path).mkdir(parents=True, exist_ok=True)
-            self._client = QdrantClient(path=self._path)
+            self._client = _QdrantClient(path=self._path)
         return self._client
 
     def _ensure_collection(self):
         try:
-            self.client.get_collection(self._collection_name)
+            existing = self.client.get_collection(self._collection_name)
+            # Migration: add sparse index to existing collection if enabled
+            if self._use_sparse:
+                existing_sparse = getattr(existing.config.params, "sparse_vectors", None) or {}
+                if "sparse" not in existing_sparse:
+                    try:
+                        self.client.update_collection(
+                            collection_name=self._collection_name,
+                            sparse_vectors={
+                                "sparse": _qmodels.SparseVectorParams(),
+                            },
+                        )
+                    except Exception:
+                        pass  # best-effort; will work for new docs
         except Exception:
             sparse_config = None
             if self._use_sparse:
                 sparse_config = {
-                    "sparse": qmodels.SparseVectorParams(),
+                    "sparse": _qmodels.SparseVectorParams(),
                 }
             self.client.create_collection(
                 collection_name=self._collection_name,
-                vectors_config=qmodels.VectorParams(
+                vectors_config=_qmodels.VectorParams(
                     size=self._vector_size,
-                    distance=qmodels.Distance.COSINE,
+                    distance=_qmodels.Distance.COSINE,
                 ),
                 sparse_vectors_config=sparse_config,
             )
@@ -283,13 +310,13 @@ class VectorStore:
         results = self.client.query_points(
             collection_name=self._collection_name,
             prefetch=[
-                qmodels.Prefetch(
+                _qmodels.Prefetch(
                     query=qvec,
                     using="",
                     limit=max(top_k * 2, 20),
                 ),
-                qmodels.Prefetch(
-                    query=qmodels.SparseVector(
+                _qmodels.Prefetch(
+                    query=_qmodels.SparseVector(
                         indices=list(query_sparse.keys()),
                         values=list(query_sparse.values()),
                     ),
@@ -297,7 +324,7 @@ class VectorStore:
                     limit=max(top_k, 15),
                 ),
             ],
-            query=qmodels.FusionQuery(fusion=qmodels.Fusion.RRF),
+            query=_qmodels.FusionQuery(fusion=_qmodels.Fusion.RRF),
             limit=top_k,
             with_payload=True,
         )

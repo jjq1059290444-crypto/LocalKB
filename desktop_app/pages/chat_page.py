@@ -5,7 +5,7 @@ import re
 
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QFrame,
-    QSplitter, QSizePolicy,
+    QSplitter, QSizePolicy, QLabel, QProgressBar,
 )
 from PySide6.QtCore import Qt
 
@@ -56,6 +56,34 @@ class ChatPage(QWidget):
         center_layout = QVBoxLayout(center)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
+
+        # ── Startup progress bars (hidden by default) ──
+        # Two independent rows: Qdrant/QAChain init + model warmup.
+        # Each hides individually when its task completes; the container
+        # auto-hides when both are done.
+        self._startup_progress = QFrame()
+        self._startup_progress.setStyleSheet("""
+            QFrame {
+                background: #EBF5FB;
+                border-bottom: 1px solid #BEE3F8;
+            }
+        """)
+        startup_layout = QVBoxLayout(self._startup_progress)
+        startup_layout.setContentsMargins(0, 0, 0, 0)
+        startup_layout.setSpacing(0)
+
+        self._qdrant_row = self._make_progress_row(
+            self._i18n.t("status.opening_db")
+        )
+        self._warmup_row = self._make_progress_row(
+            self._i18n.t("status.model_loading")
+        )
+        startup_layout.addWidget(self._qdrant_row)
+        startup_layout.addWidget(self._warmup_row)
+
+        self._startup_progress.hide()
+
+        center_layout.addWidget(self._startup_progress)
 
         self._chat_scroll = QScrollArea()
         self._chat_scroll.setWidgetResizable(True)
@@ -117,6 +145,8 @@ class ChatPage(QWidget):
         self.chat_input.retranslate()
         self.source_panel.retranslate()
         self.history_list.retranslate()
+        self._qdrant_row._label.setText(self._i18n.t("status.opening_db"))
+        self._warmup_row._label.setText(self._i18n.t("status.model_loading"))
 
     def _on_send(self, text):
         if self._worker and self._worker.isRunning():
@@ -144,19 +174,6 @@ class ChatPage(QWidget):
         top_k = config.get("top_k", 10)
 
         print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Top-K: {top_k}", flush=True)
-
-        # ── Warm up embed model in MAIN thread (avoids ~50% crash in QThread) ──
-        from config.presets import get_embed_model_path
-        embed_model_name = get_embed_model_path(
-            config.get("embed_model", "bge-small-zh-v1.5")
-        )
-        try:
-            from core.indexing.embedder import warmup_model
-            warmup_model(embed_model_name)
-        except Exception as e:
-            print(f"[DEBUG {_time.strftime('%H:%M:%S')}] Embedder warmup FAILED: {e}", flush=True)
-            self._on_error(str(e))
-            return
 
         self._worker = QAWorker(self.qa_chain, text, top_k=top_k,
                                session=self._session if not self.chat_input.is_single_turn() else None)
@@ -199,6 +216,106 @@ class ChatPage(QWidget):
             msg = self._i18n.t("chat.error_prefix", error=err)
             self._current_ai_bubble.set_text(msg, state="ERROR")
         self.chat_input.set_enabled(True)
+
+    def set_qa_chain(self, qa_chain):
+        """Set or update the QA chain reference.
+
+        Called by MainWindow when StartupWorker completes, replacing the
+        initial None with a fully initialized QA chain for streaming Q&A.
+        """
+        self.qa_chain = qa_chain
+
+    # ── Startup progress bars ──
+
+    def _make_progress_row(self, label_text: str) -> QWidget:
+        """Create a single progress row: label + indeterminate bar."""
+        row = QWidget()
+        row.setFixedHeight(30)
+        row.setStyleSheet("background: transparent; border: none;")
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(12, 0, 12, 0)
+        layout.setSpacing(10)
+
+        label = QLabel(label_text)
+        label.setStyleSheet(
+            "color: #2B6CB0; font-size: 12px; font-weight: 500;"
+            "border: none; background: transparent;"
+        )
+
+        bar = QProgressBar()
+        bar.setRange(0, 0)  # indeterminate
+        bar.setFixedHeight(4)
+        bar.setMaximumWidth(200)
+        bar.setTextVisible(False)
+        bar.setStyleSheet("""
+            QProgressBar {
+                background: #E2E8F0;
+                border: none;
+                border-radius: 2px;
+            }
+            QProgressBar::chunk {
+                background: #4A90D9;
+                border-radius: 2px;
+            }
+        """)
+
+        layout.addWidget(label)
+        layout.addWidget(bar)
+        layout.addStretch()
+
+        # Store references for later text updates
+        row._label = label
+        row._bar = bar
+        row._desired_visible = True  # rows start visible; container controls actual visibility
+        return row
+
+    def set_qdrant_progress_visible(self, visible: bool, text: str = None):
+        """Show/hide the Qdrant/QAChain init progress row."""
+        if text is not None:
+            self._qdrant_row._label.setText(text)
+        self._qdrant_row._desired_visible = visible
+        self._qdrant_row.setVisible(visible)
+        self._update_startup_progress_visibility()
+
+    def set_warmup_progress_visible(self, visible: bool, text: str = None):
+        """Show/hide the model warmup progress row."""
+        if text is not None:
+            self._warmup_row._label.setText(text)
+        elif visible:
+            self._warmup_row._label.setText(self._i18n.t("status.model_loading"))
+        self._warmup_row._desired_visible = visible
+        self._warmup_row.setVisible(visible)
+        self._update_startup_progress_visibility()
+
+    def _update_startup_progress_visibility(self):
+        """Hide the progress container when both rows are hidden.
+
+        Uses _desired_visible flags (not isVisible()) because child widget
+        isVisible() returns False when the parent container is hidden,
+        creating a chicken-and-egg problem.
+        """
+        any_visible = (
+            self._qdrant_row._desired_visible
+            or self._warmup_row._desired_visible
+        )
+        self._startup_progress.setVisible(any_visible)
+
+    def set_input_enabled(self, enabled: bool):
+        """Enable or disable the chat input controls.
+
+        Called by MainWindow to disable input while the model is loading,
+        then re-enable once warmup completes.
+        """
+        self.chat_input.set_enabled(enabled)
+        if enabled:
+            # Restore normal placeholder
+            self.chat_input._input.setPlaceholderText(
+                self._i18n.t("input.placeholder")
+            )
+        else:
+            self.chat_input._input.setPlaceholderText(
+                self._i18n.t("input.loading_placeholder")
+            )
 
     def _save_history(self, result: dict):
         entry = {

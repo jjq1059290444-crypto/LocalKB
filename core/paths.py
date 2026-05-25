@@ -14,7 +14,7 @@ def _get_base_dir() -> Path:
 BASE_DIR = _get_base_dir()
 
 DATA_DIR = BASE_DIR / "data"
-CHROMA_DIR = DATA_DIR / "chroma_db"           # legacy — kept for migration
+
 VECTOR_DB_DIR = DATA_DIR / "vector_db"        # Qdrant Embedded
 RAW_DIR = BASE_DIR / "raw_docs"
 DOCS_DIR = DATA_DIR / "docs"              # uploaded originals preserved across resets
@@ -27,8 +27,6 @@ CHUNK_MAP_FILE = DATA_DIR / "chunk_map.pkl"
 EMBEDDINGS_FILE = DATA_DIR / "embeddings.npy"
 QA_HISTORY_FILE = DATA_DIR / "qa_history.jsonl"
 REGISTRY_FILE = DATA_DIR / "registry.json"
-
-CHROMA_COLLECTION = "local_kb"
 
 # HuggingFace mirror for mainland China (set before any HF import)
 if not os.environ.get("HF_ENDPOINT"):
@@ -45,5 +43,5 @@ CONFIG_DIR = Path(os.environ.get(
 ))
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
-for _d in [DATA_DIR, MODELS_DIR, CONFIG_DIR, CHROMA_DIR, VECTOR_DB_DIR, RAW_DIR, DOCS_DIR]:
+for _d in [DATA_DIR, MODELS_DIR, CONFIG_DIR, VECTOR_DB_DIR, RAW_DIR, DOCS_DIR]:
     _d.mkdir(parents=True, exist_ok=True)

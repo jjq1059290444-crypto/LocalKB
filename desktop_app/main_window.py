@@ -11,10 +11,7 @@ from PySide6.QtGui import QIcon, QMouseEvent, QColor
 from PySide6.QtWidgets import QGraphicsDropShadowEffect
 
 from pages.chat_page import ChatPage
-from pages.kb_manage_page import KBManagePage
-from pages.settings_page import SettingsPage
-from pages.api_config_page import APIConfigPage
-from pages.about_page import AboutPage
+from workers.warmup_worker import WarmupWorker
 
 NAV_ITEMS = [
     ("nav.chat", 0),
@@ -252,35 +249,25 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(self._sidebar)
 
-        # Page stack
+        # Page stack — only chat page is created eagerly;
+        # pages 1-4 are built on first navigation to speed up cold start.
         self._stack = QStackedWidget()
         self._stack.setStyleSheet("QStackedWidget { background: #FFFFFF; }")
 
+        self._pages: list[QWidget | None] = [None] * len(NAV_ITEMS)
         self.chat_page = ChatPage(
             qa_chain=qa_chain,
             config_manager=config_manager,
             i18n=i18n,
         )
-        self.kb_page = KBManagePage(
-            vector_store=vector_store,
-            config_manager=config_manager,
-            i18n=i18n,
-        )
-        self.settings_page = SettingsPage(
-            config_manager=config_manager,
-            i18n=i18n,
-        )
-        self.api_page = APIConfigPage(
-            config_manager=config_manager,
-            i18n=i18n,
-        )
-        self.about_page = AboutPage(i18n=i18n)
+        self._pages[0] = self.chat_page
+        self._stack.addWidget(self.chat_page)
 
-        self._stack.addWidget(self.chat_page)      # 0
-        self._stack.addWidget(self.kb_page)        # 1
-        self._stack.addWidget(self.settings_page)  # 2
-        self._stack.addWidget(self.api_page)       # 3
-        self._stack.addWidget(self.about_page)     # 4
+        # Placeholder attributes for backward-compatible access
+        self.kb_page = None
+        self.settings_page = None
+        self.api_page = None
+        self.about_page = None
 
         main_layout.addWidget(self._stack)
 
@@ -322,15 +309,196 @@ class MainWindow(QMainWindow):
 
         self.setStatusBar(self._status)
 
+        # ── Loading state ──
+        # Track parallel init completion (Qdrant+QAChain and model warmup
+        # run concurrently in background threads).
+        self._startup_done = (self.qa_chain is not None)
+        self._warmup_done = (not self._embed_model_name)  # no model → trivially done
+
+        if self.qa_chain is not None:
+            # QA chain already initialized (legacy synchronous path) — start warmup
+            if self._embed_model_name:
+                self._start_model_warmup()
+        else:
+            # QA chain will be set later via StartupWorker — show both progress bars.
+            # WarmupWorker is started in parallel by main.py.
+            self.chat_page.set_qdrant_progress_visible(True)
+            self.chat_page.set_warmup_progress_visible(True)
+            self.chat_page.set_input_enabled(False)
+
         self._nav_buttons[0].setChecked(True)
 
     def _switch_page(self, index):
+        # Lazy-create page on first navigation
+        if self._pages[index] is None:
+            self._create_page(index)
         self._stack.setCurrentIndex(index)
         for i, btn in enumerate(self._nav_buttons):
             btn.setChecked(i == index)
 
+    def _create_page(self, index: int):
+        """Create a page on first navigation (lazy init)."""
+        if index == 1:
+            from pages.kb_manage_page import KBManagePage
+            page = KBManagePage(
+                vector_store=self.vector_store,
+                config_manager=self.config_manager,
+                i18n=self._i18n,
+            )
+            self.kb_page = page
+        elif index == 2:
+            from pages.settings_page import SettingsPage
+            page = SettingsPage(
+                config_manager=self.config_manager,
+                i18n=self._i18n,
+            )
+            self.settings_page = page
+        elif index == 3:
+            from pages.api_config_page import APIConfigPage
+            page = APIConfigPage(
+                config_manager=self.config_manager,
+                i18n=self._i18n,
+            )
+            self.api_page = page
+        elif index == 4:
+            from pages.about_page import AboutPage
+            page = AboutPage(i18n=self._i18n)
+            self.about_page = page
+        else:
+            return  # page 0 (chat) is already created
+
+        self._pages[index] = page
+        self._stack.addWidget(page)
+
     def set_status(self, text):
         self._status.showMessage(text)
+
+    # ── Parallel startup coordination ──
+    # StartupWorker (Qdrant + QAChain) and WarmupWorker (embedding model)
+    # run concurrently.  Input is enabled only when BOTH complete.
+
+    def _on_startup_ready(self, qa_chain, vector_store):
+        """Called by StartupWorker when Qdrant + QAChain init completes."""
+        self.qa_chain = qa_chain
+        self.vector_store = vector_store
+
+        # Hide Qdrant progress bar
+        self.chat_page.set_qdrant_progress_visible(False)
+
+        # Update lazy-created pages that reference vector_store
+        for page in self._pages:
+            if page is not None and hasattr(page, 'vector_store'):
+                page.vector_store = vector_store
+            if page is not None and hasattr(page, 'qa_chain'):
+                page.qa_chain = qa_chain
+
+        self.chat_page.set_qa_chain(qa_chain)
+
+        if qa_chain is not None:
+            config = self.config_manager.load() if self.config_manager else {}
+            self.set_status(
+                self._i18n.t("status.ready_with_model",
+                             model=config.get("model", "unknown"),
+                             api_base=config.get("api_base", ""))
+                if self._i18n else "Ready"
+            )
+        else:
+            self.set_status(
+                self._i18n.t("status.not_configured")
+                if self._i18n else "Not configured"
+            )
+
+        self._startup_done = True
+        self._check_both_ready()
+
+    def _on_warmup_ready(self):
+        """Called by WarmupWorker when the embedding model finishes loading."""
+        self.chat_page.set_warmup_progress_visible(False)
+        self._warmup_done = True
+        self._check_both_ready()
+
+    def _on_warmup_error(self, err: str):
+        """Called by WarmupWorker when model loading fails."""
+        self.chat_page.set_warmup_progress_visible(False)
+        self._warmup_done = True
+        if self._i18n:
+            self.set_status(self._i18n.t("status.init_error", error=err))
+        else:
+            self.set_status(f"Model load failed: {err}")
+        self._check_both_ready()
+
+    def _check_both_ready(self):
+        """Enable chat input when both StartupWorker and WarmupWorker finish."""
+        if not (self._startup_done and self._warmup_done):
+            return
+
+        if self.qa_chain is not None:
+            self.chat_page.set_input_enabled(True)
+        # If qa_chain is None, input stays disabled, status already set
+
+    def _on_startup_error(self, phase: str, detail: str):
+        """Slot called by StartupWorker when an unrecoverable error occurs.
+
+        Args:
+            phase: "vector_db" (Qdrant locked/failed) or "qa_chain" (LLM init failed).
+            detail: Human-readable error message.
+        """
+        if phase == "vector_db":
+            # Qdrant locked or failed — show critical dialog, quit
+            from PySide6.QtWidgets import QMessageBox
+            from core.paths import VECTOR_DB_DIR
+            self.chat_page.set_qdrant_progress_visible(False)
+            self.chat_page.set_warmup_progress_visible(False)
+            msg = detail
+            if "already accessed" in msg or "AlreadyLocked" in msg or "Permission denied" in msg:
+                QMessageBox.critical(
+                    self,
+                    self._i18n.t("status.vector_db_locked_title"),
+                    self._i18n.t("status.vector_db_locked_msg",
+                                 path=str(VECTOR_DB_DIR)),
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    self._i18n.t("status.init_error_title"),
+                    self._i18n.t("status.init_error", error=detail),
+                )
+            from PySide6.QtWidgets import QApplication
+            QApplication.quit()
+        else:
+            # QA chain failed — keep window open, show status error
+            self.chat_page.set_qdrant_progress_visible(False)
+            self.chat_page.set_warmup_progress_visible(False)
+            self.set_status(
+                self._i18n.t("status.init_failed", error=detail)
+                if self._i18n else f"Init failed: {detail}"
+            )
+
+    def _start_model_warmup(self):
+        """Disable input, show progress banner, start background warmup."""
+        self.chat_page.set_input_enabled(False)
+        self.chat_page.set_warmup_progress_visible(True)
+
+        self._warmup_worker = WarmupWorker(self._embed_model_name)
+        self._warmup_worker.ready.connect(self._on_model_ready)
+        self._warmup_worker.error.connect(self._on_model_error)
+        self._warmup_worker.start()
+
+    def _on_model_ready(self):
+        """Model loaded — hide banner, enable input."""
+        self.chat_page.set_warmup_progress_visible(False)
+        self.chat_page.set_input_enabled(True)
+
+    def _on_model_error(self, err: str):
+        """Model warmup failed — hide banner, keep input disabled, show hint."""
+        self.chat_page.set_warmup_progress_visible(False)
+        self.chat_page.set_input_enabled(False)
+        if self._i18n:
+            self._status.showMessage(
+                self._i18n.t("status.init_error", error=err)
+            )
+        else:
+            self._status.showMessage(f"Model load failed: {err}")
 
     # ── i18n ──
     def _on_lang_combo_changed(self, text: str):
@@ -363,9 +531,8 @@ class MainWindow(QMainWindow):
         )
 
     def _retranslate_pages(self):
-        for page in (self.chat_page, self.kb_page, self.settings_page,
-                     self.api_page, self.about_page):
-            if hasattr(page, "retranslate"):
+        for page in self._pages:
+            if page is not None and hasattr(page, "retranslate"):
                 page.retranslate()
 
     def _title_press(self, event: QMouseEvent):

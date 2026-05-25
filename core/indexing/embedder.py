@@ -72,31 +72,70 @@ def embed_dense(texts: list[str],
     return arr
 
 
-# ── sparse embedding (BGE-M3 only) ────────────────────────────────
+# ── sparse embedding ─────────────────────────────────────────────
+
+# Cache for pure-Python fallback embedder
+_SPARSE_FALLBACK = None
+
+
+def _get_sparse_fallback():
+    """Return the pure-Python SparseEmbedder singleton."""
+    global _SPARSE_FALLBACK
+    if _SPARSE_FALLBACK is None:
+        from core.indexing.sparse_embedder import SparseEmbedder
+        _SPARSE_FALLBACK = SparseEmbedder()
+    return _SPARSE_FALLBACK
+
+
+def sparse_fallback_available() -> bool:
+    """Whether the pure-Python sparse fallback is available (always True)."""
+    return True
+
 
 def embed_sparse(texts: list[str],
-                 model_name: str = "BAAI/bge-m3") -> list[dict[str, float]]:
+                 model_name: str = "BAAI/bge-m3") -> list[dict[int, float]]:
     """Encode texts into sparse lexical-weight vectors.
 
-    Each element is a dict mapping token_id (int) → weight (float).
-    Requires FlagEmbedding and a sparse-capable model like BGE-M3.
+    Uses FlagEmbedding for BGE-M3 when available; falls back to
+    pure-Python character n-gram hashing for any model.
 
     Returns:
         List of dicts, one per input text.
     """
-    _, sparse_list = embed_both(texts, model_name=model_name)
-    return sparse_list
+    if supports_sparse(model_name):
+        _, sparse_list = embed_both(texts, model_name=model_name)
+        return sparse_list
+    return _get_sparse_fallback().encode(texts)
 
 
 def embed_both(texts: list[str],
                model_name: str = "BAAI/bge-m3",
                matryoshka_dim: Optional[int] = None,
                batch_size: int = 32) -> tuple[np.ndarray, list[dict[int, float]]]:
-    """One-pass dense + sparse encoding (BGE-M3 only).
+    """One-pass dense + sparse encoding.
+
+    Uses FlagEmbedding for sparse-capable models (BGE-M3) when the
+    library is importable. Falls back to SentenceTransformer (dense)
+    + pure-Python character n-gram hashing (sparse) otherwise.
 
     Returns:
         (dense_array [N, dim], list[dict[int, float]])
     """
+    if supports_sparse(model_name):
+        return _embed_both_flag(texts, model_name, matryoshka_dim, batch_size)
+
+    # Fallback: dense from SentenceTransformer, sparse from n-gram hasher
+    dense = embed_dense(texts, model_name=model_name,
+                        matryoshka_dim=matryoshka_dim, batch_size=batch_size)
+    sparse_list = _get_sparse_fallback().encode(texts)
+    return dense, sparse_list
+
+
+def _embed_both_flag(texts: list[str],
+                     model_name: str,
+                     matryoshka_dim: Optional[int],
+                     batch_size: int) -> tuple[np.ndarray, list[dict[int, float]]]:
+    """Dense + sparse via FlagEmbedding (BGE-M3 only)."""
     flag = _load_flag(model_name)
 
     output = flag.encode(
@@ -154,14 +193,12 @@ def warmup_model(model_name: str) -> None:
 
 
 def supports_sparse(model_name: str) -> bool:
-    """Whether this model can output sparse lexical weights."""
+    """Whether this model can output sparse lexical weights natively."""
     # BGE-M3 is the only model we know supports sparse natively
     if "bge-m3" in model_name.lower():
-        try:
-            import FlagEmbedding  # noqa: F401
+        from importlib.util import find_spec
+        if find_spec("FlagEmbedding") is not None:
             return True
-        except ImportError:
-            return False
     return False
 
 

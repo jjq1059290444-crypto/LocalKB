@@ -42,14 +42,16 @@ EMBED_MODELS = {
         "dim": 512,
         "lang": "zh",
         "matryoshka": None,
-        "sparse": False,
+        "sparse": True,
+        "sparse_native": False,
     },
     "all-MiniLM-L6-v2": {
         "name": "sentence-transformers/all-MiniLM-L6-v2",
         "dim": 384,
         "lang": "en",
         "matryoshka": None,
-        "sparse": False,
+        "sparse": True,
+        "sparse_native": False,
     },
     "bge-m3": {
         "name": "BAAI/bge-m3",
@@ -57,6 +59,7 @@ EMBED_MODELS = {
         "lang": "multi",
         "matryoshka": [1024, 768, 512, 256],
         "sparse": True,
+        "sparse_native": True,
     },
 }
 

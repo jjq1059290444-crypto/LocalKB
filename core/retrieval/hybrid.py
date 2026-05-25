@@ -51,18 +51,31 @@ class HybridRetriever:
         t_emb = _time.perf_counter()
 
         # ── BGE-M3 / sparse-capable: one call → both vectors ──
-        from core.indexing.embedder import supports_sparse, embed_both
+        from core.indexing.embedder import (supports_sparse, embed_both,
+                                             sparse_fallback_available, embed_sparse)
 
-        if supports_sparse(self.embed_model_name):
-            try:
-                dense_arr, sparse_list = embed_both(
-                    [query], model_name=self.embed_model_name,
-                )
-                dense_vec = dense_arr[0]
-                sparse_vec = sparse_list[0] if sparse_list else None
-            except Exception as e:
-                _p(f"embed_both FAILED: {e}")
-                raise
+        use_sparse = supports_sparse(self.embed_model_name) or sparse_fallback_available()
+
+        if use_sparse:
+            if supports_sparse(self.embed_model_name):
+                try:
+                    dense_arr, sparse_list = embed_both(
+                        [query], model_name=self.embed_model_name,
+                    )
+                    dense_vec = dense_arr[0]
+                    sparse_vec = sparse_list[0] if sparse_list else None
+                except Exception as e:
+                    _p(f"embed_both FAILED: {e}")
+                    raise
+            else:
+                # Dense from SentenceTransformer, sparse from n-gram fallback
+                try:
+                    dense_vec = self._embed_dense([query])[0]
+                    sparse_list = embed_sparse([query], model_name=self.embed_model_name)
+                    sparse_vec = sparse_list[0] if sparse_list else None
+                except Exception as e:
+                    _p(f"dense+sparse embedding FAILED: {e}")
+                    raise
         else:
             # ── Other models: dense-only via SentenceTransformer ──
             try:
