@@ -1,6 +1,6 @@
 # LocalKB — 本地 RAG 知识库
 
-一个 Windows 桌面端本地 RAG（检索增强生成）知识库应用。拖入文档，用自然语言提问，数据全程不出本机。
+一个 Windows 桌面端本地 RAG（检索增强生成）知识库应用。文档存储和向量检索完全在本机，LLM 推理调用远程 API（DeepSeek / OpenAI / Ollama 等）。
 
 ## 功能
 
