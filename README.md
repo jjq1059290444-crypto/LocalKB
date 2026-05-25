@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <b>拖入文档，自然语言提问。📄 + 💬 = ✨ &nbsp; ₍ᐢ•ﻌ•ᐢ₎ &nbsp; /ᐠ. .ᐟ\ฅ &nbsp; ʕ·ᴥ·ʔ &nbsp; ₍ᐢ.ˬ.ᐢ₎</b>
+  <b>输入问题，得到答案。📄 + 💬 = ✨ &nbsp; ₍ᐢ•ﻌ•ᐢ₎ &nbsp; /ᐠ. .ᐟ\ฅ &nbsp; ʕ·ᴥ·ʔ &nbsp; ₍ᐢ.ˬ.ᐢ₎</b>
 </p>
 
 <p align="center">
