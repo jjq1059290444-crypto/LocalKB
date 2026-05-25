@@ -44,6 +44,22 @@ cd LocalKB
 3. **设置页**：调整检索条数、温度、嵌入模型、切片策略、对话模式等
 4. **对话问答**：用自然语言提问，实时获得带来源标注的回答
 
+### 文档预处理建议
+
+对于 **PDF 扫描件、复杂排版、含表格/公式的文档**，直接拖入的解析质量有限。建议先用 [MinerU](https://github.com/opendatalab/MinerU) 预处理：
+
+```bash
+# 1. 用 MinerU 将 PDF 转为高质量 Markdown
+mineru -p /path/to/pdf -o /path/to/output
+
+# 2. MinerU 输出的 .md 文件按章节/主题人工分块（每个 chunk 一个文件），
+#    放入 data/docs/ 目录
+
+# 3. 打开 LocalKB，切到知识库管理，点击「扫描新文件」或拖入
+```
+
+MinerU 的优势：自动识别表格、公式（LaTeX）、页眉页脚过滤、阅读顺序还原，远优于 PyMuPDF 的原始提取。对于**纯文本 Markdown / txt 文档**则直接拖入即可，系统内置的结构化分块器已足够。
+
 ## 嵌入模型
 
 | 模型 | 维度 | 语言 | 大小 | 稀疏向量 |
